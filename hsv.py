@@ -26,9 +26,17 @@ while(1):
     dilation_element = cv2.getStructuringElement(cv2.MORPH_RECT, (2 * dilation_size + 1, 2 * dilation_size + 1), (dilation_size, dilation_size))
     dilated = cv2.dilate(eroded, dilation_element)
 
-    _, contours, hierarchy = cv2.findContours(dilated, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    _, contours, hierarchy = cv2.findContours(dilated, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
-    frame = cv2.drawContours(frame, contours, -1, (0, 255, 0), 3)
+    if len(contours):
+        biggest_contour = max(contours, key=cv2.contourArea)
+        M = cv2.moments(biggest_contour)
+        cX = int(M["m10"] / (M["m00"] + 0.00001))
+        cY = int(M["m01"] / (M["m00"] + 0.00001))
+        # print(m)
+        cv2.circle(frame, (cX, cY), 10, (255, 0, 0), -1)
+
+        cv2.drawContours(frame, [biggest_contour], -1, (0, 255, 0), 3)
 
     # Bitwise-AND mask and original image
     res = cv2.bitwise_and(frame, frame, mask=dilated)
@@ -36,7 +44,7 @@ while(1):
     cv2.imshow('frame',frame)
     # cv2.imshow('mask',mask)
     # cv2.imshow('eroded', eroded)
-    cv2.imshow('dilated', dilated)
+    # cv2.imshow('dilated', dilated)
     # cv2.imshow('res',res)
     k = cv2.waitKey(5) & 0xFF
     if k == 27:
