@@ -82,8 +82,8 @@ def detect_puck_position(frame):
     # Convert BGR to HSV
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     # define range of blue color in HSV
-    lower_color = np.array([30, 50, 50])
-    upper_color = np.array([50, 255, 255])
+    lower_color = np.array([100, 50, 50])
+    upper_color = np.array([140, 255, 255])
     # Threshold the HSV image to get only blue colors
     mask = cv2.inRange(hsv, lower_color, upper_color)
     erosion_size = 2
@@ -221,6 +221,9 @@ class Debug(object):
 table_size = (1200, 600)
 
 cap = cv2.VideoCapture(0)
+
+print(str(cap.get(cv2.CAP_PROP_FPS)))
+
 translator = WorldToFrameTranslator((cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT)), table_size)
 tracker = Tracker()
 world = World(table_size)
