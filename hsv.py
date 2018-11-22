@@ -3,6 +3,7 @@ import numpy as np
 from sklearn import preprocessing
 import math
 
+
 class Tracker(object):
     x = None
     y = None
@@ -34,12 +35,41 @@ class Tracker(object):
         return self.old_vector, math.sqrt(velocity_square)
 
 
+class WorldToFrameTranslator(object):
+    def __init__(self, frame_size, table_size):
+        self.frame_width, self.frame_height = frame_size
+        self.table_width, self.table_height = table_size
+
+
+        print (frame_size)
+
+
+
+        self.horizontal_margin = 10
+        frame_field_width = self.frame_width - self.horizontal_margin * 2
+        frame_field_height = frame_field_width / 2
+        self.vertical_margin = (self.frame_height - frame_field_height) / 2
+
+        self.horizontal_ratio = self.table_width / frame_field_width
+        self.vertical_ratio = self.table_height / frame_field_height
+
+    def w2f(self, point):
+        pX, pY = point
+
+        return int(pX / self.horizontal_ratio + self.horizontal_margin), int(pY / self.vertical_ratio + self.vertical_margin)
+
+    def f2w(self, point):
+        pX, pY = point
+
+        return int(pX * self.horizontal_ratio - self.horizontal_margin), int(pY * self.vertical_ratio - self.vertical_margin)
+
+
 def detect_puck_position(frame):
     # Convert BGR to HSV
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     # define range of blue color in HSV
-    lower_color = np.array([25, 50, 50])
-    upper_color = np.array([35, 255, 255])
+    lower_color = np.array([30, 50, 50])
+    upper_color = np.array([50, 255, 255])
     # Threshold the HSV image to get only blue colors
     mask = cv2.inRange(hsv, lower_color, upper_color)
     erosion_size = 2
@@ -66,37 +96,88 @@ def detect_puck_position(frame):
         cY = int(M["m01"] / (M["m00"] + 0.00001))
         # print(m)
 
-        return (cX, cY), biggest_contour
+        return cX, cY
 
-    return (None, None), None
+    return None
 
+
+class PuckInfo(object):
+    def __init__(self, position, vector, velocity):
+        self.vector = vector
+        self.velocity = velocity
+        self.position = position
+
+
+class Game(object):
+    def __init__(self, table_size):
+        self.table_size = table_size
+
+    def tick(self, puck_info):
+        self.puck_info = puck_info
+
+    def get_debug(self):
+        return dict(
+            puck_info=self.puck_info,
+            table_size=self.table_size
+        )
+
+
+class Debug(object):
+    def __init__(self, translator):
+        self.translator = translator
+
+    def draw(self, frame, debug_info):
+        # puck center
+        cv2.circle(
+            frame,
+            self.translator.w2f(debug_info['puck_info'].position),
+            10, (255, 0, 0), -1)
+
+        # puck vector
+        cX, cY = self.translator.w2f(debug_info['puck_info'].position)
+        vX, vY = debug_info['puck_info'].vector
+        velocity = debug_info['puck_info'].velocity
+        line_len = 0
+        if velocity > 10:
+            line_len = velocity * 2
+        cv2.line(frame, (cX, cY), (int(cX + vX * line_len), int(cY + vY * line_len)), (0, 255, 0), 7)
+
+        # table
+        cv2.rectangle(frame, translator.w2f((0, 0)), translator.w2f(debug_info['table_size']), (0, 255, 255), 2)
+
+        # debug
+        cv2.namedWindow('frame', cv2.WINDOW_NORMAL)
+        cv2.resizeWindow('frame', 600, 600)
+        cv2.imshow('frame', frame)
+
+
+table_size = (1200, 600)
 
 cap = cv2.VideoCapture(0)
-
+translator = WorldToFrameTranslator((cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT)), table_size)
 tracker = Tracker()
+game = Game(table_size)
+debug = Debug(translator)
 
 while(1):
-
-    # Take each frame
     _, frame = cap.read()
+    frame = cv2.flip(frame, 1)
 
-    (cX, cY), biggest_contour = detect_puck_position(frame)
+    puck_position = detect_puck_position(frame)
+    if puck_position is None:
+        continue
 
-    if biggest_contour is not None:
-        cv2.circle(frame, (cX, cY), 10, (255, 0, 0), -1)
+    puck_position = translator.f2w(puck_position)
 
-        track = tracker.direction(cX, cY)
+    track = tracker.direction(*puck_position)
+    if track is None:
+        continue
 
-        if track is not None:
-            (vX, vY), velocity = track
-            line_len = 0
+    vector, velocity = track
+    game.tick(PuckInfo(puck_position, vector, velocity))
 
-            if velocity > 10:
-                line_len = velocity * 2
+    debug.draw(frame, game.get_debug())
 
-            cv2.line(frame, (cX, cY), (int(cX + vX * line_len), int(cY + vY * line_len)), (0, 255, 0), 7)
-
-    cv2.imshow('frame', frame)
     k = cv2.waitKey(5) & 0xFF
     if k == 27:
         break
