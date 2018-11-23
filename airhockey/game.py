@@ -4,6 +4,7 @@ from sklearn import preprocessing
 import math
 import time
 
+
 def get_intersect(a1, a2, b1, b2):
     """ 
     Returns the point of intersection of the lines passing through a2,a1 and b2,b1.
@@ -13,15 +14,15 @@ def get_intersect(a1, a2, b1, b2):
     b2: [x, y] another point on the second line
     """
 
-    s = np.vstack([a1,a2,b1,b2])        # s for stacked
-    h = np.hstack((s, np.ones((4, 1)))) # h for homogeneous
-    l1 = np.cross(h[0], h[1])           # get first line
-    l2 = np.cross(h[2], h[3])           # get second line
-    x, y, z = np.cross(l1, l2)          # point of intersection
-    if z == 0:                          # lines are parallel
+    s = np.vstack([a1, a2, b1, b2])  # s for stacked
+    h = np.hstack((s, np.ones((4, 1))))  # h for homogeneous
+    l1 = np.cross(h[0], h[1])  # get first line
+    l2 = np.cross(h[2], h[3])  # get second line
+    x, y, z = np.cross(l1, l2)  # point of intersection
+    if z == 0:  # lines are parallel
         return (float('inf'), float('inf'))
 
-    return (x/z, y/z)
+    return (x / z, y / z)
 
 
 class Tracker(object):
@@ -38,7 +39,7 @@ class Tracker(object):
         dx = x - self.x
         dy = y - self.y
 
-        velocity_square = dx*dx + dy*dy
+        velocity_square = dx * dx + dy * dy
 
         vector = preprocessing.normalize(
             np.asarray([dx, dy]).reshape(1, -1)
@@ -70,12 +71,14 @@ class WorldToFrameTranslator(object):
     def w2f(self, point):
         pX, pY = point
 
-        return int(pX / self.horizontal_ratio + self.horizontal_margin), int(pY / self.vertical_ratio + self.vertical_margin)
+        return int(pX / self.horizontal_ratio + self.horizontal_margin), int(
+            pY / self.vertical_ratio + self.vertical_margin)
 
     def f2w(self, point):
         pX, pY = point
 
-        return int(pX * self.horizontal_ratio - self.horizontal_margin), int(pY * self.vertical_ratio - self.vertical_margin)
+        return int(pX * self.horizontal_ratio - self.horizontal_margin), int(
+            pY * self.vertical_ratio - self.vertical_margin)
 
 
 def detect_puck_position(frame):
@@ -132,46 +135,52 @@ class GameStrategy(object):
 
 class World(object):
     def __init__(self, table_size):
+        self.puck_info = None
         self.table_width, self.table_height = table_size
         self.table_size = table_size
         self.trajectory = []
 
     def tick(self, puck_info):
         self.puck_info = puck_info
+        self.calculate_puck_trajectory()
 
-        p_x, p_y = puck_info.position
-        v_x, v_y = puck_info.vector
-
+    def calculate_puck_trajectory(self):
         self.trajectory = []
         for x in range(0, int(self.table_width / 2), 5):
-            intersection = get_intersect(
-                (x, 0), (x, 1),
-                puck_info.position, (p_x + v_x, p_y + v_y)
-            )
+            intersection = self.intersect_puck_trajectory_at_x(x)
+            if intersection is not None:
+                self.trajectory.append(intersection)
 
-            i_x, i_y = intersection
+    def intersect_puck_trajectory_at_x(self, x):
+        p_x, p_y = self.puck_info.position
+        v_x, v_y = self.puck_info.vector
+        intersection = get_intersect(
+            (x, 0), (x, 1),
+            self.puck_info.position, (p_x + v_x, p_y + v_y)
+        )
+        i_x, i_y = intersection
 
-            if i_x == float('inf'):
-                continue
+        if i_x == float('inf'):
+            return None
 
-            d_x = i_x - p_x
-            d_y = i_y - p_y
+        d_x = i_x - p_x
+        d_y = i_y - p_y
 
-            distance = math.sqrt(d_x*d_x + d_y*d_y)
+        distance = math.sqrt(d_x * d_x + d_y * d_y)
 
-            if puck_info.velocity != 0:
-                time = distance / puck_info.velocity
-            else:
-                time = 'Infinity'
+        if self.puck_info.velocity != 0:
+            time = distance / self.puck_info.velocity
+        else:
+            time = float('inf')
 
-            n = int(i_y / self.table_height)
-            if i_y < 0 or i_y > self.table_height:
-                i_y = abs(i_y) - abs(n * self.table_height)
+        n = int(i_y / self.table_height)
+        if i_y < 0 or i_y > self.table_height:
+            i_y = abs(i_y) - abs(n * self.table_height)
 
-                if n % 2 != 0:
-                    i_y = self.table_height - i_y
+            if n % 2 != 0:
+                i_y = self.table_height - i_y
 
-            self.trajectory.append(((i_x, i_y), time))
+        return (i_x, i_y), time
 
     def get_debug(self):
         return dict(
@@ -210,7 +219,8 @@ class Debug(object):
             line_len = velocity * 2
         cv2.line(frame, (cX, cY), (int(cX + vX * line_len), int(cY + vY * line_len)), (0, 255, 0), 7)
 
-        cv2.putText(frame, str("FPS: {0}".format(fps)), (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (160, 127, 235), thickness=3)
+        cv2.putText(frame, str("FPS: {0}".format(fps)), (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (160, 127, 235),
+                    thickness=3)
         # debug
         cv2.namedWindow('frame', cv2.WINDOW_NORMAL)
         cv2.resizeWindow('frame', 600, 600)
@@ -218,7 +228,6 @@ class Debug(object):
 
 
 class FrameThrottler(object):
-
     def __init__(self, desired_fps):
         self.desired_fps = desired_fps
         self.last_frame_time = None
@@ -241,51 +250,52 @@ class FrameThrottler(object):
         self.fps = self.number_of_frames / (self.last_frame_time - self.start)
 
 
-table_size = (1200, 600)
+if __name__ == '__main__':
 
-cap = cv2.VideoCapture(0)
+    table_size = (1200, 600)
 
-print(str(cap.get(cv2.CAP_PROP_FPS)))
+    cap = cv2.VideoCapture(0)
 
-translator = WorldToFrameTranslator((cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT)), table_size)
-tracker = Tracker()
-world = World(table_size)
-debug = Debug(translator)
+    print(str(cap.get(cv2.CAP_PROP_FPS)))
 
-frame_throttler = FrameThrottler(desired_fps=5)
+    translator = WorldToFrameTranslator((cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+                                        table_size)
+    tracker = Tracker()
+    world = World(table_size)
+    debug = Debug(translator)
 
-while(1):
-    frame_throttler.throttle()
+    frame_throttler = FrameThrottler(desired_fps=5)
 
-    _, frame = cap.read()
-    frame = cv2.flip(frame, 1)
+    while (1):
+        frame_throttler.throttle()
 
-    puck_position = detect_puck_position(frame)
-    if puck_position is None:
-        continue
+        _, frame = cap.read()
+        frame = cv2.flip(frame, 1)
 
-    puck_position = translator.f2w(puck_position)
+        puck_position = detect_puck_position(frame)
+        if puck_position is None:
+            continue
 
-    track = tracker.direction(*puck_position)
-    if track is None:
-        continue
+        puck_position = translator.f2w(puck_position)
 
-    vector, velocity = track
+        track = tracker.direction(*puck_position)
+        if track is None:
+            continue
 
-    # puck_position = (900, 300)
-    # vector = preprocessing.normalize(
-    #     np.asarray([-1, -2.2]).reshape(1, -1)
-    # )[0]
-    # velocity = 100
+        vector, velocity = track
 
-    world.tick(PuckInfo(puck_position, vector, velocity))
+        # puck_position = (900, 300)
+        # vector = preprocessing.normalize(
+        #     np.asarray([-1, -2.2]).reshape(1, -1)
+        # )[0]
+        # velocity = 100
 
-    debug.draw(frame, world.get_debug(), fps=frame_throttler.fps)
+        world.tick(PuckInfo(puck_position, vector, velocity))
 
-    k = cv2.waitKey(5) & 0xFF
-    if k == 27:
-        break
+        debug.draw(frame, world.get_debug(), fps=frame_throttler.fps)
 
+        k = cv2.waitKey(5) & 0xFF
+        if k == 27:
+            break
 
-cv2.destroyAllWindows()
-
+    cv2.destroyAllWindows()
