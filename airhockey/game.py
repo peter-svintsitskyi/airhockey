@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from sklearn import preprocessing
 import math
-
+import time
 
 def get_intersect(a1, a2, b1, b2):
     """ 
@@ -82,7 +82,7 @@ def detect_puck_position(frame):
     # Convert BGR to HSV
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     # define range of blue color in HSV
-    lower_color = np.array([100, 50, 50])
+    lower_color = np.array([100, 100, 100])
     upper_color = np.array([140, 255, 255])
     # Threshold the HSV image to get only blue colors
     mask = cv2.inRange(hsv, lower_color, upper_color)
@@ -134,9 +134,7 @@ class World(object):
     def __init__(self, table_size):
         self.table_width, self.table_height = table_size
         self.table_size = table_size
-        self.trajectory = [
-            (100, 100)
-        ]
+        self.trajectory = []
 
     def tick(self, puck_info):
         self.puck_info = puck_info
@@ -145,7 +143,7 @@ class World(object):
         v_x, v_y = puck_info.vector
 
         self.trajectory = []
-        for x in range(0, int(self.table_width / 2), 100):
+        for x in range(0, int(self.table_width / 2), 5):
             intersection = get_intersect(
                 (x, 0), (x, 1),
                 puck_info.position, (p_x + v_x, p_y + v_y)
@@ -187,7 +185,16 @@ class Debug(object):
     def __init__(self, translator):
         self.translator = translator
 
-    def draw(self, frame, debug_info):
+    def draw(self, frame, debug_info, fps):
+        # table
+        cv2.rectangle(frame, translator.w2f((0, 0)), translator.w2f(debug_info['table_size']), (0, 255, 255), 2)
+
+        # trajectory
+        for intersection in debug_info['trajectory']:
+            point, velocity = intersection
+            cv2.circle(frame, translator.w2f(point), 10, (0, 0, 255), -1)
+            # cv2.putText(frame, str(velocity), translator.w2f(point), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 127, 255), thickness=3)
+
         # puck center
         cv2.circle(
             frame,
@@ -203,19 +210,35 @@ class Debug(object):
             line_len = velocity * 2
         cv2.line(frame, (cX, cY), (int(cX + vX * line_len), int(cY + vY * line_len)), (0, 255, 0), 7)
 
-        # table
-        cv2.rectangle(frame, translator.w2f((0, 0)), translator.w2f(debug_info['table_size']), (0, 255, 255), 2)
-
-        # trajectory
-        for intersection in debug_info['trajectory']:
-            point, velocity = intersection
-            cv2.circle(frame, translator.w2f(point), 10, (0, 0, 255), -1)
-            cv2.putText(frame, str(velocity), translator.w2f(point), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 127, 255), thickness=3)
-
+        cv2.putText(frame, str("FPS: {0}".format(fps)), (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (160, 127, 235), thickness=3)
         # debug
         cv2.namedWindow('frame', cv2.WINDOW_NORMAL)
         cv2.resizeWindow('frame', 600, 600)
         cv2.imshow('frame', frame)
+
+
+class FrameThrottler(object):
+
+    def __init__(self, desired_fps):
+        self.desired_fps = desired_fps
+        self.last_frame_time = None
+        self.fps = 0
+        self.start = time.time()
+        self.number_of_frames = 0
+
+    def throttle(self):
+        if self.last_frame_time is None:
+            self.last_frame_time = time.time()
+
+        self.number_of_frames += 1
+
+        diff = time.time() - self.last_frame_time
+        if diff < 1 / self.desired_fps:
+            time.sleep(1 / self.desired_fps - diff)
+
+        self.last_frame_time = time.time()
+
+        self.fps = self.number_of_frames / (self.last_frame_time - self.start)
 
 
 table_size = (1200, 600)
@@ -229,7 +252,11 @@ tracker = Tracker()
 world = World(table_size)
 debug = Debug(translator)
 
+frame_throttler = FrameThrottler(desired_fps=5)
+
 while(1):
+    frame_throttler.throttle()
+
     _, frame = cap.read()
     frame = cv2.flip(frame, 1)
 
@@ -253,11 +280,12 @@ while(1):
 
     world.tick(PuckInfo(puck_position, vector, velocity))
 
-    debug.draw(frame, world.get_debug())
+    debug.draw(frame, world.get_debug(), fps=frame_throttler.fps)
 
     k = cv2.waitKey(5) & 0xFF
     if k == 27:
         break
+
 
 cv2.destroyAllWindows()
 
