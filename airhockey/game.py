@@ -6,6 +6,7 @@ import time
 import socket
 import json
 
+
 def get_intersect(a1, a2, b1, b2):
     """ 
     Returns the point of intersection of the lines passing through a2,a1 and b2,b1.
@@ -143,17 +144,28 @@ class Robot(object):
     def get_position(self):
         self.sock.sendall(bytes("{}\n", "utf-8"))
         received = str(self.sock.recv(1024), "utf-8")
-        return json.loads(received)
+        p = json.loads(received)
+        return p['x'], p['y']
 
     def move_to(self, point):
         x, y = point
-        self.sock.sendall(bytes('\{"x":{x},"y":{y}\}\n'.format(x=x, y=y), "utf-8"))
+        self.sock.sendall(bytes('{{"move": {{"x":{x},"y":{y}}}}}\n'.format(x=x, y=y), "utf-8"))
         received = str(self.sock.recv(1024), "utf-8")
-        return json.loads(received)
+        p = json.loads(received)
+        return p['x'], p['y']
 
 
 class GameStrategy(object):
-    pass
+    def __init__(self, world, robot):
+        self.world = world
+        self.robot = robot
+
+    def tick(self):
+        if len(self.world.trajectory) == 0:
+            return
+
+        point, eta = self.world.trajectory[0]
+        self.robot.move_to(point)
 
 
 class World(object):
@@ -169,7 +181,7 @@ class World(object):
 
     def calculate_puck_trajectory(self):
         self.trajectory = []
-        for x in range(0, int(self.table_width / 2), 5):
+        for x in range(0, int(self.table_width / 2), 10):
             intersection = self.intersect_puck_trajectory_at_x(x)
             if intersection is not None:
                 self.trajectory.append(intersection)
@@ -217,7 +229,7 @@ class Debug(object):
     def __init__(self, translator):
         self.translator = translator
 
-    def draw(self, frame, world_debug, fps):
+    def draw(self, frame, world_debug, robot_position, fps):
         # table
         cv2.rectangle(frame, translator.w2f((0, 0)), translator.w2f(world_debug['table_size']), (0, 255, 255), 2)
 
@@ -241,6 +253,9 @@ class Debug(object):
         if velocity > 10:
             line_len = velocity * 2
         cv2.line(frame, (cX, cY), (int(cX + vX * line_len), int(cY + vY * line_len)), (0, 255, 0), 7)
+
+        # robot position
+        cv2.circle(frame, self.translator.w2f(robot_position), 10, (255, 0, 255), -1)
 
         cv2.putText(frame, str("FPS: {0}".format(fps)), (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (160, 127, 235),
                     thickness=3)
@@ -279,8 +294,6 @@ if __name__ == '__main__':
 
     cap = cv2.VideoCapture(0)
 
-    print(str(cap.get(cv2.CAP_PROP_FPS)))
-
     translator = WorldToFrameTranslator((cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
                                         table_size)
     tracker = Tracker()
@@ -289,7 +302,10 @@ if __name__ == '__main__':
 
     frame_throttler = FrameThrottler(desired_fps=10)
 
-    with Robot("127.0.0.1", 9998) as robot:
+    with Robot("127.0.0.1", 9999) as robot:
+
+        game_strategy = GameStrategy(world, robot)
+
         while (1):
             frame_throttler.throttle()
 
@@ -301,25 +317,18 @@ if __name__ == '__main__':
                 continue
 
             puck_position = translator.f2w(puck_position)
-
             track = tracker.direction(*puck_position)
             if track is None:
                 continue
 
             vector, velocity = track
 
-            # puck_position = (900, 300)
-            # vector = preprocessing.normalize(
-            #     np.asarray([-1, -2.2]).reshape(1, -1)
-            # )[0]
-            # velocity = 100
-
             world.tick(PuckInfo(puck_position, vector, velocity))
+            game_strategy.tick()
 
-            print(robot.get_position())
-            print ('a')
+            robot_position = robot.get_position()
 
-            debug.draw(frame, world.get_debug(), fps=frame_throttler.fps)
+            debug.draw(frame, world.get_debug(), robot_position=robot_position, fps=frame_throttler.fps)
 
             k = cv2.waitKey(5) & 0xFF
             if k == 27:

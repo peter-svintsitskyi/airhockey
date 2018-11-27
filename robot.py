@@ -12,7 +12,7 @@ class Robot(object):
         self.current_x = 0
         self.current_y = 0
         self.move_start_time = 0
-        self.velocity = 100
+        self.velocity = 200
 
     def handle(self, command):
         if self.move_start_time > 0:
@@ -27,8 +27,6 @@ class Robot(object):
                 k = 1
             else:
                 k = to_go / velocity_dt
-
-            print("{dx}: {dy}, k={k}".format(dx=dx, dy=dy, k=k))
 
             self.current_x += dx / k
             self.current_y += dy / k
@@ -53,7 +51,7 @@ class Robot(object):
 if __name__ == "__main__":
     r = Robot()
 
-    HOST, PORT = "localhost", 9998
+    HOST, PORT = "localhost", 9999
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
