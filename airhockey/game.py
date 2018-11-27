@@ -3,7 +3,8 @@ import numpy as np
 from sklearn import preprocessing
 import math
 import time
-
+import socket
+import json
 
 def get_intersect(a1, a2, b1, b2):
     """ 
@@ -126,7 +127,29 @@ class PuckInfo(object):
 
 
 class Robot(object):
-    pass
+    def __init__(self, host, port):
+        self.host = host
+        self.port = port
+
+    def __enter__(self):
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.connect((self.host, self.port))
+
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.sock.close()
+
+    def get_position(self):
+        self.sock.sendall(bytes("{}\n", "utf-8"))
+        received = str(self.sock.recv(1024), "utf-8")
+        return json.loads(received)
+
+    def move_to(self, point):
+        x, y = point
+        self.sock.sendall(bytes('\{"x":{x},"y":{y}\}\n'.format(x=x, y=y), "utf-8"))
+        received = str(self.sock.recv(1024), "utf-8")
+        return json.loads(received)
 
 
 class GameStrategy(object):
@@ -194,12 +217,12 @@ class Debug(object):
     def __init__(self, translator):
         self.translator = translator
 
-    def draw(self, frame, debug_info, fps):
+    def draw(self, frame, world_debug, fps):
         # table
-        cv2.rectangle(frame, translator.w2f((0, 0)), translator.w2f(debug_info['table_size']), (0, 255, 255), 2)
+        cv2.rectangle(frame, translator.w2f((0, 0)), translator.w2f(world_debug['table_size']), (0, 255, 255), 2)
 
         # trajectory
-        for intersection in debug_info['trajectory']:
+        for intersection in world_debug['trajectory']:
             point, velocity = intersection
             cv2.circle(frame, translator.w2f(point), 10, (0, 0, 255), -1)
             # cv2.putText(frame, str(velocity), translator.w2f(point), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 127, 255), thickness=3)
@@ -207,13 +230,13 @@ class Debug(object):
         # puck center
         cv2.circle(
             frame,
-            self.translator.w2f(debug_info['puck_info'].position),
+            self.translator.w2f(world_debug['puck_info'].position),
             10, (255, 0, 0), -1)
 
         # puck vector
-        cX, cY = self.translator.w2f(debug_info['puck_info'].position)
-        vX, vY = debug_info['puck_info'].vector
-        velocity = debug_info['puck_info'].velocity
+        cX, cY = self.translator.w2f(world_debug['puck_info'].position)
+        vX, vY = world_debug['puck_info'].vector
+        velocity = world_debug['puck_info'].velocity
         line_len = 0
         if velocity > 10:
             line_len = velocity * 2
@@ -264,38 +287,42 @@ if __name__ == '__main__':
     world = World(table_size)
     debug = Debug(translator)
 
-    frame_throttler = FrameThrottler(desired_fps=5)
+    frame_throttler = FrameThrottler(desired_fps=10)
 
-    while (1):
-        frame_throttler.throttle()
+    with Robot("127.0.0.1", 9998) as robot:
+        while (1):
+            frame_throttler.throttle()
 
-        _, frame = cap.read()
-        frame = cv2.flip(frame, 1)
+            _, frame = cap.read()
+            frame = cv2.flip(frame, 1)
 
-        puck_position = detect_puck_position(frame)
-        if puck_position is None:
-            continue
+            puck_position = detect_puck_position(frame)
+            if puck_position is None:
+                continue
 
-        puck_position = translator.f2w(puck_position)
+            puck_position = translator.f2w(puck_position)
 
-        track = tracker.direction(*puck_position)
-        if track is None:
-            continue
+            track = tracker.direction(*puck_position)
+            if track is None:
+                continue
 
-        vector, velocity = track
+            vector, velocity = track
 
-        # puck_position = (900, 300)
-        # vector = preprocessing.normalize(
-        #     np.asarray([-1, -2.2]).reshape(1, -1)
-        # )[0]
-        # velocity = 100
+            # puck_position = (900, 300)
+            # vector = preprocessing.normalize(
+            #     np.asarray([-1, -2.2]).reshape(1, -1)
+            # )[0]
+            # velocity = 100
 
-        world.tick(PuckInfo(puck_position, vector, velocity))
+            world.tick(PuckInfo(puck_position, vector, velocity))
 
-        debug.draw(frame, world.get_debug(), fps=frame_throttler.fps)
+            print(robot.get_position())
+            print ('a')
 
-        k = cv2.waitKey(5) & 0xFF
-        if k == 27:
-            break
+            debug.draw(frame, world.get_debug(), fps=frame_throttler.fps)
+
+            k = cv2.waitKey(5) & 0xFF
+            if k == 27:
+                break
 
     cv2.destroyAllWindows()
