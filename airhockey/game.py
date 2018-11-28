@@ -5,7 +5,7 @@ import math
 import time
 import socket
 import json
-
+from random import randint
 
 def get_intersect(a1, a2, b1, b2):
     """ 
@@ -83,12 +83,12 @@ class WorldToFrameTranslator(object):
             pY * self.vertical_ratio - self.vertical_margin)
 
 
-def detect_puck_position(frame):
+def detect_puck_position(frame, low_color, high_color):
     # Convert BGR to HSV
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     # define range of blue color in HSV
-    lower_color = np.array([100, 100, 100])
-    upper_color = np.array([140, 255, 255])
+    lower_color = np.array([low_color, 100, 100])
+    upper_color = np.array([high_color, 255, 255])
     # Threshold the HSV image to get only blue colors
     mask = cv2.inRange(hsv, lower_color, upper_color)
     erosion_size = 2
@@ -103,7 +103,7 @@ def detect_puck_position(frame):
     # res = cv2.bitwise_and(frame, frame, mask=dilated)
     # cv2.imshow('mask',mask)
     # cv2.imshow('eroded', eroded)
-    # cv2.imshow('dilated', dilated)
+    cv2.imshow('dilated', dilated)
     # cv2.imshow('res',res)
 
     _, contours, __ = cv2.findContours(dilated, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
@@ -164,7 +164,9 @@ class GameStrategy(object):
         if len(self.world.trajectory) == 0:
             return
 
-        point, eta = self.world.trajectory[0]
+        index = randint(0, len(self.world.trajectory) - 1)
+
+        point, eta = self.world.trajectory[index]
         self.robot.move_to(point)
 
 
@@ -181,7 +183,7 @@ class World(object):
 
     def calculate_puck_trajectory(self):
         self.trajectory = []
-        for x in range(0, int(self.table_width / 2), 10):
+        for x in range(0, int(self.puck_info.position[0] / 2), 10):
             intersection = self.intersect_puck_trajectory_at_x(x)
             if intersection is not None:
                 self.trajectory.append(intersection)
@@ -240,19 +242,20 @@ class Debug(object):
             # cv2.putText(frame, str(velocity), translator.w2f(point), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 127, 255), thickness=3)
 
         # puck center
-        cv2.circle(
-            frame,
-            self.translator.w2f(world_debug['puck_info'].position),
-            10, (255, 0, 0), -1)
+        if world_debug['puck_info'] is not None:
+            cv2.circle(
+                frame,
+                self.translator.w2f(world_debug['puck_info'].position),
+                10, (255, 0, 0), -1)
 
-        # puck vector
-        cX, cY = self.translator.w2f(world_debug['puck_info'].position)
-        vX, vY = world_debug['puck_info'].vector
-        velocity = world_debug['puck_info'].velocity
-        line_len = 0
-        if velocity > 10:
-            line_len = velocity * 2
-        cv2.line(frame, (cX, cY), (int(cX + vX * line_len), int(cY + vY * line_len)), (0, 255, 0), 7)
+            # puck vector
+            cX, cY = self.translator.w2f(world_debug['puck_info'].position)
+            vX, vY = world_debug['puck_info'].vector
+            velocity = world_debug['puck_info'].velocity
+            line_len = 0
+            if velocity > 10:
+                line_len = velocity * 2
+            cv2.line(frame, (cX, cY), (int(cX + vX * line_len), int(cY + vY * line_len)), (0, 255, 0), 7)
 
         # robot position
         cv2.circle(frame, self.translator.w2f(robot_position), 10, (255, 0, 255), -1)
@@ -260,7 +263,7 @@ class Debug(object):
         cv2.putText(frame, str("FPS: {0}".format(fps)), (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (160, 127, 235),
                     thickness=3)
         # debug
-        cv2.namedWindow('frame', cv2.WINDOW_NORMAL)
+        #cv2.namedWindow('frame', cv2.WINDOW_NORMAL)
         cv2.resizeWindow('frame', 600, 600)
         cv2.imshow('frame', frame)
 
@@ -290,6 +293,12 @@ class FrameThrottler(object):
 
 if __name__ == '__main__':
 
+    cv2.namedWindow('frame', cv2.WINDOW_NORMAL)
+    cv2.createTrackbar('Low', 'frame', 0, 255, lambda x: None)
+    cv2.setTrackbarPos('Low', 'frame', 100)
+    cv2.createTrackbar('High', 'frame', 0, 255, lambda x: None)
+    cv2.setTrackbarPos('High', 'frame', 140)
+
     table_size = (1200, 600)
 
     cap = cv2.VideoCapture(0)
@@ -312,18 +321,18 @@ if __name__ == '__main__':
             _, frame = cap.read()
             frame = cv2.flip(frame, 1)
 
-            puck_position = detect_puck_position(frame)
-            if puck_position is None:
-                continue
+            puck_position = detect_puck_position(frame, cv2.getTrackbarPos('Low', 'frame'), cv2.getTrackbarPos('High', 'frame'))
+            if puck_position is not None:
 
-            puck_position = translator.f2w(puck_position)
-            track = tracker.direction(*puck_position)
-            if track is None:
-                continue
+                puck_position = translator.f2w(puck_position)
+                track = tracker.direction(*puck_position)
+                if track is not None:
+                    vector, velocity = track
+                    world.tick(PuckInfo(puck_position, vector, velocity))
 
-            vector, velocity = track
+            else:
+                print('Puck not found')
 
-            world.tick(PuckInfo(puck_position, vector, velocity))
             game_strategy.tick()
 
             robot_position = robot.get_position()
