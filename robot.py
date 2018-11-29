@@ -42,6 +42,8 @@ class Robot(object):
                 self.destination_y = move["y"]
                 self.move_start_time = time.time()
 
+                print("Moving to: {x}, {y}".format(x=self.destination_x, y=self.destination_y))
+
         return {
             "x": self.current_x,
             "y": self.current_y
@@ -51,7 +53,7 @@ class Robot(object):
 if __name__ == "__main__":
     r = Robot()
 
-    HOST, PORT = "localhost", 9999
+    HOST, PORT = "0.0.0.0", 9999
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 

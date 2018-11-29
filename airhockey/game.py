@@ -6,6 +6,8 @@ import time
 import socket
 import json
 from random import randint
+from threading import Thread
+
 
 def get_intersect(a1, a2, b1, b2):
     """ 
@@ -103,7 +105,7 @@ def detect_puck_position(frame, low_color, high_color):
     # res = cv2.bitwise_and(frame, frame, mask=dilated)
     # cv2.imshow('mask',mask)
     # cv2.imshow('eroded', eroded)
-    cv2.imshow('dilated', dilated)
+    # cv2.imshow('dilated', dilated)
     # cv2.imshow('res',res)
 
     _, contours, __ = cv2.findContours(dilated, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
@@ -231,7 +233,7 @@ class Debug(object):
     def __init__(self, translator):
         self.translator = translator
 
-    def draw(self, frame, world_debug, robot_position, fps):
+    def draw(self, frame, world_debug, robot_position, fps, video_stream):
         # table
         cv2.rectangle(frame, translator.w2f((0, 0)), translator.w2f(world_debug['table_size']), (0, 255, 255), 2)
 
@@ -260,8 +262,11 @@ class Debug(object):
         # robot position
         cv2.circle(frame, self.translator.w2f(robot_position), 10, (255, 0, 255), -1)
 
-        cv2.putText(frame, str("FPS: {0}".format(fps)), (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (160, 127, 235),
-                    thickness=3)
+        cv2.putText(frame, str("FPS: {0:.2f}".format(fps)), (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), thickness=3)
+        cv2.putText(frame, str("Stream: {0}/{1:.2f} fps".format(video_stream.frames_read_from_stream, video_stream.stream_fps())), (10, 80),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), thickness=3)
+        cv2.putText(frame, str("Processed: {0}/{1:.2f} fps".format(video_stream.frames_processed, video_stream.processing_fps())), (10, 110),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), thickness=3)
         # debug
         #cv2.namedWindow('frame', cv2.WINDOW_NORMAL)
         cv2.resizeWindow('frame', 600, 600)
@@ -291,6 +296,57 @@ class FrameThrottler(object):
         self.fps = self.number_of_frames / (self.last_frame_time - self.start)
 
 
+class VideoStream(object):
+    def __init__(self, path, frame_dimensions):
+        frame_width, frame_height = frame_dimensions
+        self.stream = cv2.VideoCapture(path)
+        self.stream.set(cv2.CAP_PROP_FRAME_WIDTH, frame_width)
+        self.stream.set(cv2.CAP_PROP_FRAME_HEIGHT, frame_height)
+        self.stopped = False
+        self.frame = None
+        self.frames_read_from_stream = 0
+        self.frames_processed = 0
+        self.time_started = time.time()
+
+    def start(self):
+        t = Thread(target=self.update, args=())
+        t.daemon = True
+        t.start()
+        return self
+
+    def update(self):
+        while True:
+            if self.stopped:
+                return
+
+            (grabbed, frame) = self.stream.read()
+
+            if not grabbed:
+                self.stop()
+                return
+
+            self.frame = frame
+            self.frames_read_from_stream += 1
+
+    def read(self):
+        self.frames_processed += 1
+        return self.frame
+
+    def has_frame(self):
+        # return True if there are still frames in the queue
+        return self.frame is not None
+
+    def stop(self):
+        # indicate that the thread should be stopped
+        self.stopped = True
+
+    def stream_fps(self):
+        return self.frames_read_from_stream / (time.time() - self.time_started)
+
+    def processing_fps(self):
+        return self.frames_processed / (time.time() - self.time_started)
+
+
 if __name__ == '__main__':
 
     cv2.namedWindow('frame', cv2.WINDOW_NORMAL)
@@ -299,26 +355,37 @@ if __name__ == '__main__':
     cv2.createTrackbar('High', 'frame', 0, 255, lambda x: None)
     cv2.setTrackbarPos('High', 'frame', 140)
 
-    table_size = (1200, 600)
 
     cap = cv2.VideoCapture(0)
+    print('camera resolution {w}:{h}'.format(w=cap.get(cv2.CAP_PROP_FRAME_WIDTH), h=cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+    cap.release()
 
-    translator = WorldToFrameTranslator((cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
-                                        table_size)
+    table_size = (1200, 600)
+    frame_size = (1280, 960)
+
+    translator = WorldToFrameTranslator(frame_size, table_size)
+
     tracker = Tracker()
     world = World(table_size)
     debug = Debug(translator)
 
     frame_throttler = FrameThrottler(desired_fps=10)
 
-    with Robot("127.0.0.1", 9999) as robot:
+    video_stream = VideoStream(0, frame_size)
+    video_stream.start()
+
+    while not video_stream.has_frame():
+        time.sleep(0.1)
+
+    with Robot("192.168.0.173", 9999) as robot:
 
         game_strategy = GameStrategy(world, robot)
 
-        while (1):
+        while video_stream.has_frame():
             frame_throttler.throttle()
 
-            _, frame = cap.read()
+            # _, frame = cap.read()
+            frame = video_stream.read()
             frame = cv2.flip(frame, 1)
 
             puck_position = detect_puck_position(frame, cv2.getTrackbarPos('Low', 'frame'), cv2.getTrackbarPos('High', 'frame'))
@@ -337,10 +404,11 @@ if __name__ == '__main__':
 
             robot_position = robot.get_position()
 
-            debug.draw(frame, world.get_debug(), robot_position=robot_position, fps=frame_throttler.fps)
+            debug.draw(frame, world.get_debug(), robot_position=robot_position, fps=frame_throttler.fps, video_stream=video_stream)
 
             k = cv2.waitKey(5) & 0xFF
             if k == 27:
                 break
 
     cv2.destroyAllWindows()
+    video_stream.stop()
