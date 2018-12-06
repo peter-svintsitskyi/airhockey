@@ -53,7 +53,7 @@ class Robot(object):
 if __name__ == "__main__":
     r = Robot()
 
-    HOST, PORT = "0.0.0.0", 9999
+    HOST, PORT = "0.0.0.0", 9998
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 

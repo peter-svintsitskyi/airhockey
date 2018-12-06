@@ -81,45 +81,70 @@ class WorldToFrameTranslator(object):
     def f2w(self, point):
         pX, pY = point
 
-        return int(pX * self.horizontal_ratio - self.horizontal_margin), int(
-            pY * self.vertical_ratio - self.vertical_margin)
+        return int((pX - self.horizontal_margin) * self.horizontal_ratio), int(
+            (pY - self.vertical_margin) * self.vertical_ratio)
 
 
-def detect_puck_position(frame, low_color, high_color):
-    # Convert BGR to HSV
-    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    # define range of blue color in HSV
-    lower_color = np.array([low_color, 100, 100])
-    upper_color = np.array([high_color, 255, 255])
-    # Threshold the HSV image to get only blue colors
-    mask = cv2.inRange(hsv, lower_color, upper_color)
-    erosion_size = 2
-    element = cv2.getStructuringElement(cv2.MORPH_RECT, (2 * erosion_size + 1, 2 * erosion_size + 1),
-                                        (erosion_size, erosion_size))
-    eroded = cv2.erode(mask, element)
-    dilation_size = 3
-    dilation_element = cv2.getStructuringElement(cv2.MORPH_RECT, (2 * dilation_size + 1, 2 * dilation_size + 1),
-                                                 (dilation_size, dilation_size))
-    dilated = cv2.dilate(eroded, dilation_element)
-    # Bitwise-AND mask and original image
-    # res = cv2.bitwise_and(frame, frame, mask=dilated)
-    # cv2.imshow('mask',mask)
-    # cv2.imshow('eroded', eroded)
-    # cv2.imshow('dilated', dilated)
-    # cv2.imshow('res',res)
+class ColorDetector(object):
+    def __init__(self, *, h_low, h_high, sv_low):
+        self.h_low = h_low
+        self.h_high = h_high
+        self.sv_low = sv_low
+        self.position = None
+        self.frame = None
+        self.stopped = False
+        self.mask = None
 
-    _, contours, __ = cv2.findContours(dilated, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    def set_h_low(self, v):
+        self.h_low = v
 
-    if len(contours):
-        biggest_contour = max(contours, key=cv2.contourArea)
-        M = cv2.moments(biggest_contour)
-        cX = int(M["m10"] / (M["m00"] + 0.00001))
-        cY = int(M["m01"] / (M["m00"] + 0.00001))
-        # print(m)
+    def set_h_high(self, v):
+        self.h_high = v
 
-        return cX, cY
+    def set_sv_low(self, v):
+        self.sv_low = v
 
-    return None
+    def set_frame(self, frame):
+        self.frame = frame
+
+    def start(self):
+        t = Thread(target=self.detect_puck_position, args=())
+        t.daemon = True
+        t.start()
+        return self
+
+    def stop(self):
+        self.stopped = True
+
+    def detect_puck_position(self):
+        while True:
+            if self.frame is None:
+                time.sleep(0.1)
+                continue
+
+            if self.stopped:
+                return
+
+            # Convert BGR to HSV
+            hsv = cv2.cvtColor(self.frame, cv2.COLOR_BGR2HSV)
+
+            # define range of blue color in HSV
+            lower_color = np.array([self.h_low, self.sv_low, self.sv_low])
+            upper_color = np.array([self.h_high, 255, 255])
+
+            # Threshold the HSV image to get only blue colors
+            mask = cv2.inRange(hsv, lower_color, upper_color)
+
+            self.mask = mask
+
+            _, contours, __ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+
+            if len(contours):
+                biggest_contour = max(contours, key=cv2.contourArea)
+                M = cv2.moments(biggest_contour)
+                cX = int(M["m10"] / (M["m00"] + 0.00001))
+                cY = int(M["m01"] / (M["m00"] + 0.00001))
+                self.position = (cX, cY)
 
 
 class PuckInfo(object):
@@ -185,7 +210,11 @@ class World(object):
 
     def calculate_puck_trajectory(self):
         self.trajectory = []
-        for x in range(0, int(self.puck_info.position[0] / 2), 10):
+
+        if self.puck_info.vector[0] > 0:
+            return
+
+        for x in range(0, int(self.puck_info.position[0] / 2), 100):
             intersection = self.intersect_puck_trajectory_at_x(x)
             if intersection is not None:
                 self.trajectory.append(intersection)
@@ -260,7 +289,8 @@ class Debug(object):
             cv2.line(frame, (cX, cY), (int(cX + vX * line_len), int(cY + vY * line_len)), (0, 255, 0), 7)
 
         # robot position
-        cv2.circle(frame, self.translator.w2f(robot_position), 10, (255, 0, 255), -1)
+        if robot_position is not None:
+            cv2.circle(frame, self.translator.w2f(robot_position), 10, (255, 0, 255), -1)
 
         cv2.putText(frame, str("FPS: {0:.2f}".format(fps)), (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), thickness=3)
         cv2.putText(frame, str("Stream: {0}/{1:.2f} fps".format(video_stream.frames_read_from_stream, video_stream.stream_fps())), (10, 80),
@@ -308,6 +338,9 @@ class VideoStream(object):
         self.frames_processed = 0
         self.time_started = time.time()
 
+    def get_real_frame_size(self):
+        return self.stream.get(cv2.CAP_PROP_FRAME_WIDTH), self.stream.get(cv2.CAP_PROP_FRAME_HEIGHT)
+
     def start(self):
         t = Thread(target=self.update, args=())
         t.daemon = True
@@ -349,19 +382,35 @@ class VideoStream(object):
 
 if __name__ == '__main__':
 
+    PUCK_H_LOW = 50
+    PUCK_H_HIGH = 80
+    PUCK_SV_LOW = 50
+    puck_detector = ColorDetector(h_low=PUCK_H_LOW, h_high=PUCK_H_HIGH, sv_low=PUCK_SV_LOW)
+
+    ROBOT_H_LOW = 20
+    ROBOT_H_HIGH = 40
+    ROBOT_SV_LOW = 80
+    robot_detector = ColorDetector(h_low=ROBOT_H_LOW, h_high=ROBOT_H_HIGH, sv_low=ROBOT_SV_LOW)
+
     cv2.namedWindow('frame', cv2.WINDOW_NORMAL)
-    cv2.createTrackbar('Low', 'frame', 0, 255, lambda x: None)
-    cv2.setTrackbarPos('Low', 'frame', 100)
-    cv2.createTrackbar('High', 'frame', 0, 255, lambda x: None)
-    cv2.setTrackbarPos('High', 'frame', 140)
+    cv2.createTrackbar('Puck H Low', 'frame', 0, 255, lambda x: puck_detector.set_h_low(x))
+    cv2.setTrackbarPos('Puck H Low', 'frame', PUCK_H_LOW)
+    cv2.createTrackbar('Puck H High', 'frame', 0, 255, lambda x: puck_detector.set_h_high(x))
+    cv2.setTrackbarPos('Puck H High', 'frame', PUCK_H_HIGH)
+    cv2.createTrackbar('Puck SV Low', 'frame', 0, 255, lambda x: puck_detector.set_sv_low(x))
+    cv2.setTrackbarPos('Puck SV Low', 'frame', PUCK_SV_LOW)
 
-
-    cap = cv2.VideoCapture(0)
-    print('camera resolution {w}:{h}'.format(w=cap.get(cv2.CAP_PROP_FRAME_WIDTH), h=cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-    cap.release()
+    cv2.createTrackbar('Robot H Low', 'frame', 0, 255, lambda x: robot_detector.set_h_low(x))
+    cv2.setTrackbarPos('Robot H Low', 'frame', ROBOT_H_LOW)
+    cv2.createTrackbar('Robot H High', 'frame', 0, 255, lambda x: robot_detector.set_h_high(x))
+    cv2.setTrackbarPos('Robot H High', 'frame', ROBOT_H_HIGH)
+    cv2.createTrackbar('Robot SV Low', 'frame', 0, 255, lambda x: robot_detector.set_sv_low(x))
+    cv2.setTrackbarPos('Robot SV Low', 'frame', ROBOT_SV_LOW)
 
     table_size = (1200, 600)
-    frame_size = (1280, 960)
+    video_stream = VideoStream(0, (640, 480))
+    frame_size = video_stream.get_real_frame_size()
+    print('camera resolution {w}:{h}'.format(w=frame_size[0], h=frame_size[1]))
 
     translator = WorldToFrameTranslator(frame_size, table_size)
 
@@ -369,28 +418,28 @@ if __name__ == '__main__':
     world = World(table_size)
     debug = Debug(translator)
 
-    frame_throttler = FrameThrottler(desired_fps=10)
-
-    video_stream = VideoStream(0, frame_size)
     video_stream.start()
 
     while not video_stream.has_frame():
         time.sleep(0.1)
 
-    with Robot("192.168.0.173", 9999) as robot:
+    puck_detector.start()
+    robot_detector.start()
+
+    frame_throttler = FrameThrottler(desired_fps=500)
+    with Robot("192.168.0.173", 9998) as robot:
 
         game_strategy = GameStrategy(world, robot)
 
         while video_stream.has_frame():
             frame_throttler.throttle()
-
-            # _, frame = cap.read()
             frame = video_stream.read()
-            frame = cv2.flip(frame, 1)
+            puck_detector.set_frame(frame)
+            robot_detector.set_frame(frame)
 
-            puck_position = detect_puck_position(frame, cv2.getTrackbarPos('Low', 'frame'), cv2.getTrackbarPos('High', 'frame'))
+            puck_position = puck_detector.position
+
             if puck_position is not None:
-
                 puck_position = translator.f2w(puck_position)
                 track = tracker.direction(*puck_position)
                 if track is not None:
@@ -400,15 +449,30 @@ if __name__ == '__main__':
             else:
                 print('Puck not found')
 
-            game_strategy.tick()
+            # game_strategy.tick()
 
-            robot_position = robot.get_position()
+            robot_position = robot_detector.position
+            if robot_position is not None:
+                robot_position = translator.f2w(robot_position)
 
-            debug.draw(frame, world.get_debug(), robot_position=robot_position, fps=frame_throttler.fps, video_stream=video_stream)
+            debug.draw(frame.copy(), world.get_debug(),
+                       robot_position=robot_position,
+                       fps=frame_throttler.fps,
+                       video_stream=video_stream)
+
+            # if puck_detector.mask is not None:
+            #     cv2.imshow('puck mask', puck_detector.mask)
+            # #
+            # if robot_detector.mask is not None:
+            #     cv2.imshow('robot mask', robot_detector.mask)
 
             k = cv2.waitKey(5) & 0xFF
             if k == 27:
                 break
 
+    print(frame_throttler.fps)
+
     cv2.destroyAllWindows()
+    puck_detector.stop()
+    robot_detector.stop()
     video_stream.stop()
