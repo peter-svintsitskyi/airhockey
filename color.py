@@ -8,8 +8,8 @@ hsv_color = cv2.cvtColor(np.uint8([[[110, 100, 100]]]), cv2.COLOR_HSV2BGR)
 
 print(hsv_color)
 
-h_lower = 50
-h_upper = 80
+h_lower = 210
+h_upper = 215
 
 s_lower = 60
 s_upper = 255

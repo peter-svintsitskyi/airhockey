@@ -24,12 +24,12 @@
 
 #define MAX_SPEED 50
 #define ACC_FACTOR 1.2
-#define STEPS_PER_MM 10
+#define STEPS_PER_MM 2.083333
 
 unsigned int c0;
 
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
-IPAddress ip(192, 168, 0, 5);
+IPAddress ip(192, 168, 44, 5);
 unsigned int localPort = 8888;
 EthernetUDP Udp;
 char packetBuffer[UDP_TX_PACKET_MAX_SIZE];
@@ -37,9 +37,9 @@ StaticJsonBuffer<200> jsonBuffer;
 
 void setup() {
   Ethernet.begin(mac, ip);
-  Udp.begin(localPort);
-
   
+  // Udp.begin(localPort);
+ 
   pinMode(STEPPER1_STEP_PIN,   OUTPUT);
   pinMode(STEPPER1_DIR_PIN,    OUTPUT);
   pinMode(STEPPER2_STEP_PIN,   OUTPUT);
@@ -207,9 +207,17 @@ void moveAndWait(long steps1, long steps2)
   while (!stepper1.movementDone || !stepper2.movementDone );
 }
 
+bool udpStarted = false;
+
 void loop() {
 
   if (stepper1.movementDone && stepper2.movementDone) {
+    if (!udpStarted) {
+      Udp.begin(localPort);
+      udpStarted = true;
+    }
+
+    
     int packetSize = Udp.parsePacket();
     if (packetSize) {
       Serial1.println("Received UDP packet");
@@ -230,7 +238,11 @@ void loop() {
       }
 
       jsonBuffer.clear();
-    }    
+
+      Udp.stop();
+      udpStarted = false;
+    }
+      
   }
 
 //  moveAndWait(1000, 10000);
@@ -301,11 +313,3 @@ void loop() {
 //  while (true);
 
 }
-
-
-
-
-
-
-
-

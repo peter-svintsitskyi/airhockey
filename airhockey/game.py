@@ -160,42 +160,82 @@ class Robot(object):
         self.port = port
 
     def __enter__(self):
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.connect((self.host, self.port))
-
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)        
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.sock.close()
 
-    def get_position(self):
-        self.sock.sendall(bytes("{}\n", "utf-8"))
-        received = str(self.sock.recv(1024), "utf-8")
-        p = json.loads(received)
-        return p['x'], p['y']
-
-    def move_to(self, point):
-        x, y = point
-        self.sock.sendall(bytes('{{"move": {{"x":{x},"y":{y}}}}}\n'.format(x=x, y=y), "utf-8"))
-        received = str(self.sock.recv(1024), "utf-8")
-        p = json.loads(received)
-        return p['x'], p['y']
-
+    def delta(self, delta):
+        x, y = delta
+        self.sock.sendto(bytes('{{"x":{x},"y":{y}}}\n'.format(x=x, y=y), "utf-8"), (self.host, self.port))
+        
 
 class GameStrategy(object):
     def __init__(self, world, robot):
         self.world = world
         self.robot = robot
+        
+        self.old_x = None
+        self.old_y = None
 
-    def tick(self):
-        if len(self.world.trajectory) == 0:
+    def tick(self, *, robot_position):
+        if robot_position is None:
             return
+            
+        if self.world.puck_info is None:
+            return
+            
+        # if len(self.world.trajectory) == 0:
+        #    return
 
-        index = randint(0, len(self.world.trajectory) - 1)
+        # index = randint(0, len(self.world.trajectory) - 1)
 
-        point, eta = self.world.trajectory[index]
-        self.robot.move_to(point)
+        # point, eta = self.world.trajectory[index]
+        
+        cx, cy = robot_position
+        
+        puck_x, puck_y = world.puck_info.position
+        
+        if puck_x < 600 or puck_x > 1200 or puck_y < 0 or puck_y > 600:
+            print("puck is out of field")
+            return   
+        
+        if cx == self.old_x and cy == self.old_y and self.move:
+            self.move = False
+            
+            print("robot finished move")
+            return
+        
+        if cx < 0 or cx > 600 or cy < 0 or cy > 600:
+            print("robot current position is out of field")            
+            return
+                     
+        # e = 10   
+        # nx = randint(45 + e, 555 - e)
+        # ny = randint(45 + e, 555 - e)
+        
+        nx = 1200 - puck_x
+        ny = puck_y
 
+
+        dx = nx - cx
+        dy = ny - cy
+        
+        
+        if abs(dx) < 10 or abs(dy) < 10:
+            print("delta too small")
+            return
+        
+        self.old_x = cx
+        self.old_y = cy
+        
+        print("X = {cx} + {dx} = {nx}; Y = {cy} + {dy} = {ny}".format(cx=cx, dx=dx, cy=cy, dy=dy, nx=nx, ny=ny))
+        
+        self.robot.delta((dx, dy))
+        self.move = True
+        
+        
 
 class World(object):
     def __init__(self, table_size):
@@ -388,8 +428,8 @@ if __name__ == '__main__':
     puck_detector = ColorDetector(h_low=PUCK_H_LOW, h_high=PUCK_H_HIGH, sv_low=PUCK_SV_LOW)
 
     ROBOT_H_LOW = 20
-    ROBOT_H_HIGH = 40
-    ROBOT_SV_LOW = 80
+    ROBOT_H_HIGH = 30
+    ROBOT_SV_LOW = 125
     robot_detector = ColorDetector(h_low=ROBOT_H_LOW, h_high=ROBOT_H_HIGH, sv_low=ROBOT_SV_LOW)
 
     cv2.namedWindow('frame', cv2.WINDOW_NORMAL)
@@ -427,7 +467,7 @@ if __name__ == '__main__':
     robot_detector.start()
 
     frame_throttler = FrameThrottler(desired_fps=500)
-    with Robot("192.168.0.173", 9998) as robot:
+    with Robot("192.168.44.5", 8888) as robot:
 
         game_strategy = GameStrategy(world, robot)
 
@@ -449,7 +489,7 @@ if __name__ == '__main__':
             else:
                 print('Puck not found')
 
-            # game_strategy.tick()
+            # 
 
             robot_position = robot_detector.position
             if robot_position is not None:
@@ -460,11 +500,13 @@ if __name__ == '__main__':
                        fps=frame_throttler.fps,
                        video_stream=video_stream)
 
-            # if puck_detector.mask is not None:
-            #     cv2.imshow('puck mask', puck_detector.mask)
-            # #
-            # if robot_detector.mask is not None:
-            #     cv2.imshow('robot mask', robot_detector.mask)
+            game_strategy.tick(robot_position=robot_position)
+
+            if puck_detector.mask is not None:
+                cv2.imshow('puck mask', puck_detector.mask)
+            
+            if robot_detector.mask is not None:
+                cv2.imshow('robot mask', robot_detector.mask)
 
             k = cv2.waitKey(5) & 0xFF
             if k == 27:
