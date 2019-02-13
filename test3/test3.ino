@@ -22,7 +22,7 @@
 #define TIMER3_INTERRUPTS_ON    TIMSK3 |=  (1 << OCIE1A);
 #define TIMER3_INTERRUPTS_OFF   TIMSK3 &= ~(1 << OCIE1A);
 
-#define MAX_SPEED 50
+#define MAX_SPEED 20
 #define ACC_FACTOR 1.2
 #define STEPS_PER_MM 2.083333
 
