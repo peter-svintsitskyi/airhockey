@@ -7,7 +7,6 @@ class RampController {
   protected:
     volatile char dir = 0;
     volatile char nextDir = 0;
-    volatile unsigned int maxSpeed = 50; // 40 max
     volatile unsigned long n = 0;
     volatile float d;
     volatile unsigned long stepCount = 0;
@@ -28,11 +27,12 @@ class RampController {
 };
 
 class RampController1: public RampController {
-  virtual void setTimerInterval();
-  virtual void stepPulse();
-  virtual void disableTimerInterrupts();
-  virtual void enableTimerInterrupts();
-  virtual void setDirectionPin(unsigned char value);
+  protected:
+    virtual void setTimerInterval();
+    virtual void stepPulse();
+    virtual void disableTimerInterrupts();
+    virtual void enableTimerInterrupts();
+    virtual void setDirectionPin(unsigned char value);
 };
 
 class RampController2: public RampController {

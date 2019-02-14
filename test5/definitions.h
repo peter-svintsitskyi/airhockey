@@ -1,7 +1,7 @@
 #ifndef __definitions_h
 #define __definitions_h
 
-#include <arduino.h>
+#include <Arduino.h>
 
 #define STEPPER1_DIR_PIN          5
 #define STEPPER1_STEP_PIN         2
@@ -31,5 +31,6 @@
 #define RUN 3
 
 #define START_INTERVAL 1600
+#define MAX_SPEED 50 // 40 max
 
 #endif

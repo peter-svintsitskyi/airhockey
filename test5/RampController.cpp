@@ -72,7 +72,7 @@ void RampController::onTimerTick() {
         d = START_INTERVAL;
 
       } else {
-        TIMER1_INTERRUPTS_OFF
+        disableTimerInterrupts();
         Serial1.print("Stopped at: ");
         Serial1.println(stepPosition);    
       }
@@ -81,8 +81,8 @@ void RampController::onTimerTick() {
     case RAMP_UP:
       n++;
       d = d - (2 * d) / (4 * n + 1);
-      if ( d <= maxSpeed ) { // reached max speed
-        d = maxSpeed;
+      if ( d <= MAX_SPEED ) { // reached max speed
+        d = MAX_SPEED;
         runningState = RUN;
       }
       
@@ -139,6 +139,6 @@ void RampController::move(long steps) {
       break;
     }
   }
-  TIMER1_INTERRUPTS_ON
+  
+  enableTimerInterrupts();
 }
-
