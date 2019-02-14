@@ -21,6 +21,26 @@
 
 #define STEPS_PER_MM 2.083333
 
+#define STOP 0
+#define RAMP_UP 1
+#define RAMP_DOWN 2
+#define RUN 3
+
+typedef struct {
+  volatile char dir = 0;
+  volatile char nextDir = 0;
+  volatile unsigned int maxSpeed = 50; // 40 max
+  volatile unsigned long n = 0;
+  volatile float d;
+  volatile unsigned long stepCount = 0;
+  volatile unsigned long nextTotalSteps = 0;
+  volatile unsigned long totalSteps = 0;
+  volatile int stepPosition = 0;
+  volatile unsigned char runningState = STOP;
+} RampControlData;
+
+RampControlData rcd;
+
 unsigned int c0;
 
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
@@ -57,129 +77,102 @@ void setup() {
   delay(1000); // need this
 }
 
-volatile int dir = 0;
-volatile int nextDir = 0;
-volatile unsigned int maxSpeed = 50; // 40 max
-volatile unsigned long n = 0;
-volatile float d;
-volatile unsigned long stepCount = 0;
-volatile unsigned long nextTotalSteps = 0;
-volatile unsigned long totalSteps = 0;
-volatile int stepPosition = 0;
 
-volatile bool movementDone = false;
-
-volatile unsigned char runningState = 0;
-
-#define STOP 0
-#define RAMP_UP 1
-#define RAMP_DOWN 2
-#define RUN 3
 
 ISR(TIMER1_COMPA_vect)
 {
-  if ( stepCount < totalSteps ) {
+  if ( rcd.stepCount < rcd.totalSteps ) {
     STEP_HIGH
     STEP_LOW
-    stepCount++;
-    stepPosition += dir;
-  }
-  else {
-    movementDone = true;
-    runningState = STOP;
+    rcd.stepCount++;
+    rcd.stepPosition += rcd.dir;
+    
+  } else {
+    rcd.runningState = STOP;
   }
 
-  switch (runningState) {
+  switch (rcd.runningState) {
     case STOP:
-      if (nextTotalSteps != 0) {
-        dir = nextDir;
-        totalSteps = nextTotalSteps;
-        nextDir = 0;
-        nextTotalSteps = 0;
-        digitalWrite(DIR_PIN, dir < 0 ? HIGH : LOW);
-        runningState = RAMP_UP;
-        n = 0;
-        stepCount = 0;
-        d = c0;
-//        Serial1.print("Moving opposite direction: ");
-//        Serial1.println(totalSteps);
-//        Serial1.println(n);
-//        Serial1.println(runningState);
+      if (rcd.nextTotalSteps != 0) {
+        rcd.dir = rcd.nextDir;
+        rcd.totalSteps = rcd.nextTotalSteps;
+        rcd.nextDir = 0;
+        rcd.nextTotalSteps = 0;
+        digitalWrite(DIR_PIN, rcd.dir < 0 ? HIGH : LOW);
+        rcd.runningState = RAMP_UP;
+        rcd.n = 0;
+        rcd.stepCount = 0;
+        rcd.d = c0;
+
       } else {
         TIMER1_INTERRUPTS_OFF
         Serial1.print("Stopped at: ");
-        Serial1.println(stepPosition);    
+        Serial1.println(rcd.stepPosition);    
       }
     break;
     
     case RAMP_UP:
-      n++;
-      d = d - (2 * d) / (4 * n + 1);
-      if ( d <= maxSpeed ) { // reached max speed
-        d = maxSpeed;
-        runningState = RUN;
+      rcd.n++;
+      rcd.d = rcd.d - (2 * rcd.d) / (4 * rcd.n + 1);
+      if ( rcd.d <= rcd.maxSpeed ) { // reached max speed
+        rcd.d = rcd.maxSpeed;
+        rcd.runningState = RUN;
       }
       
-      if ( n >= totalSteps - stepCount ) { // reached halfway point
-        runningState = RAMP_DOWN;  
+      if ( rcd.n >= rcd.totalSteps - rcd.stepCount ) { // reached halfway point
+        rcd.runningState = RAMP_DOWN;  
       }
     break;
 
     case RUN:
-      if ( stepCount == totalSteps - n ) { // switch to the ramp down phase
-        runningState = RAMP_DOWN;  
+      if ( rcd.stepCount == rcd.totalSteps - rcd.n ) { // switch to the ramp down phase
+        rcd.runningState = RAMP_DOWN;  
       }
     break;
 
     case RAMP_DOWN:
-      n--;
-      d = (d * (4 * n + 1)) / (4 * n + 1 - 2);
+      rcd.n--;
+      rcd.d = (rcd.d * (4 * rcd.n + 1)) / (4 * rcd.n + 1 - 2);
     break;
   }
 
-  OCR1A = d;
+  OCR1A = rcd.d;
 }
 
 void moveNSteps(long steps) {
-  nextDir = steps > 0 ? 1 : -1;
+  rcd.nextDir = steps > 0 ? 1 : -1;
   
-  if (runningState != STOP && nextDir != 0 && nextDir != dir) {
-    stepCount = 0;
-    totalSteps = n;
-    nextTotalSteps = abs(steps) + n;
-    runningState = RAMP_DOWN;
+  if (rcd.runningState != STOP && rcd.nextDir != 0 && rcd.nextDir != rcd.dir) {
+    rcd.stepCount = 0;
+    rcd.totalSteps = rcd.n;
+    rcd.nextTotalSteps = abs(steps) + rcd.n;
+    rcd.runningState = RAMP_DOWN;
     
   } else {
-    switch (runningState) {
+    switch (rcd.runningState) {
       case STOP:
         digitalWrite(DIR_PIN, steps < 0 ? HIGH : LOW);
-        dir = steps > 0 ? 1 : -1;
-        totalSteps = abs(steps);
-        d = c0;
-        OCR1A = d;
-        stepCount = 0;
-        n = 0;
-        movementDone = false;
-        runningState = RAMP_UP;
+        rcd.dir = steps > 0 ? 1 : -1;
+        rcd.totalSteps = abs(steps);
+        rcd.d = c0;
+        OCR1A = rcd.d;
+        rcd.stepCount = 0;
+        rcd.n = 0;
+        rcd.runningState = RAMP_UP;
        break;
   
       case RAMP_UP:
       case RUN:
-        totalSteps += abs(steps);
+        rcd.totalSteps += abs(steps);
       
       case RAMP_DOWN:
-        totalSteps += abs(steps);
-        runningState = RAMP_UP;
+        rcd.totalSteps += abs(steps);
+        rcd.runningState = RAMP_UP;
         
       break;
     }
   }
   TIMER1_INTERRUPTS_ON
-}
-
-void moveToPosition(long p, bool wait = true) {
-  moveNSteps(p - stepPosition);
-  while ( wait && ! movementDone );
 }
 
 void loop() {
