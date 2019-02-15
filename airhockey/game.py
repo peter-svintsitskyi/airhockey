@@ -158,6 +158,7 @@ class Robot(object):
     def __init__(self, host, port):
         self.host = host
         self.port = port
+        self.last_delta = None
 
     def __enter__(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)        
@@ -168,6 +169,7 @@ class Robot(object):
 
     def delta(self, delta):
         x, y = delta
+        self.last_delta = delta
         self.sock.sendto(bytes('{{"x":{x},"y":{y}}}\n'.format(x=x, y=y), "utf-8"), (self.host, self.port))
         
 
@@ -302,7 +304,7 @@ class Debug(object):
     def __init__(self, translator):
         self.translator = translator
 
-    def draw(self, frame, world_debug, robot_position, fps, video_stream):
+    def draw(self, *, frame, world_debug, robot_position, robot_delta, fps, video_stream):
         # table
         cv2.rectangle(frame, translator.w2f((0, 0)), translator.w2f(world_debug['table_size']), (0, 255, 255), 2)
 
@@ -331,6 +333,12 @@ class Debug(object):
         # robot position
         if robot_position is not None:
             cv2.circle(frame, self.translator.w2f(robot_position), 10, (255, 0, 255), -1)
+            if robot_delta is not None:
+                (rX, rY) = robot_position
+                (dX, dY) = robot_delta
+                rdX = rX + dX
+                rdY = rY + dY             
+                cv2.line(frame, self.translator.w2f(robot_position), self.translator.w2f((int(rdX), int(rdY))), (0, 255, 0), 7) 
 
         cv2.putText(frame, str("FPS: {0:.2f}".format(fps)), (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), thickness=3)
         cv2.putText(frame, str("Stream: {0}/{1:.2f} fps".format(video_stream.frames_read_from_stream, video_stream.stream_fps())), (10, 80),
@@ -495,18 +503,19 @@ if __name__ == '__main__':
             if robot_position is not None:
                 robot_position = translator.f2w(robot_position)
 
-            debug.draw(frame.copy(), world.get_debug(),
+            debug.draw(frame=frame.copy(), world_debug=world.get_debug(),
                        robot_position=robot_position,
+                       robot_delta=robot.last_delta,
                        fps=frame_throttler.fps,
                        video_stream=video_stream)
 
             game_strategy.tick(robot_position=robot_position)
 
-            if puck_detector.mask is not None:
-                cv2.imshow('puck mask', puck_detector.mask)
+            #if puck_detector.mask is not None:
+            #    cv2.imshow('puck mask', puck_detector.mask)
             
-            if robot_detector.mask is not None:
-                cv2.imshow('robot mask', robot_detector.mask)
+            #if robot_detector.mask is not None:
+            #    cv2.imshow('robot mask', robot_detector.mask)
 
             k = cv2.waitKey(5) & 0xFF
             if k == 27:
