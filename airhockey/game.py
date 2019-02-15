@@ -201,11 +201,11 @@ class GameStrategy(object):
             print("puck is out of field")
             return   
         
-        if cx == self.old_x and cy == self.old_y and self.move:
-            self.move = False
+        # if cx == self.old_x and cy == self.old_y and self.move:
+        #    self.move = False
             
-            print("robot finished move")
-            return
+        #    print("robot finished move")
+        #    return
         
         if cx < 0 or cx > 600 or cy < 0 or cy > 600:
             print("robot current position is out of field")            
@@ -422,8 +422,8 @@ class VideoStream(object):
 
 if __name__ == '__main__':
 
-    PUCK_H_LOW = 50
-    PUCK_H_HIGH = 80
+    PUCK_H_LOW = 90
+    PUCK_H_HIGH = 110
     PUCK_SV_LOW = 50
     puck_detector = ColorDetector(h_low=PUCK_H_LOW, h_high=PUCK_H_HIGH, sv_low=PUCK_SV_LOW)
 
