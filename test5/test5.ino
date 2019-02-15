@@ -64,12 +64,12 @@ void loop() {
     JsonObject& root = jsonBuffer.parseObject(packetBuffer);
     if (root.success()) {
       double dX = root["x"].as<double>();
-//      double dY = root["y"].as<double>();
-//      double ds1 = (dY + dX) * STEPS_PER_MM;
-//      double ds2 = (dY - dX) * STEPS_PER_MM;
+      double dY = root["y"].as<double>();
+      double ds1 = (dY + dX) * STEPS_PER_MM;
+      double ds2 = (dY - dX) * STEPS_PER_MM;
 
-      stepper1.move(dX);
-      stepper2.move(dX);
+      stepper1.move(ds1);
+      stepper2.move(ds2);
 
       Serial1.println("Moving");
     } else {

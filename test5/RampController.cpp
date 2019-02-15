@@ -130,10 +130,12 @@ void RampController::move(long steps) {
   
       case RAMP_UP:
       case RUN:
-        totalSteps += abs(steps);
+        totalSteps = abs(steps);
+        stepCount = 0;
       
       case RAMP_DOWN:
-        totalSteps += abs(steps);
+        totalSteps = abs(steps);
+        stepCount = 0;
         runningState = RAMP_UP;
         
       break;
