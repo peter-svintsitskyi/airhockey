@@ -107,7 +107,12 @@ void RampController::onTimerTick() {
 }
 
 void RampController::move(long steps) {
+  if (steps == 0) {
+    return;
+  }
+  
   disableTimerInterrupts();
+  
   nextDir = steps > 0 ? 1 : -1;
   
   if (runningState != STOP && nextDir != 0 && nextDir != dir) {
