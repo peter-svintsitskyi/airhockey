@@ -200,7 +200,7 @@ class GameStrategy(object):
         puck_x, puck_y = world.puck_info.position
         
         if puck_x < 600 or puck_x > 1200 or puck_y < 0 or puck_y > 600:
-            print("puck is out of field")
+            print("puck is out of field | PX = {px}, PY = {py}".format(px=puck_x, py=puck_y))
             return   
         
         # if cx == self.old_x and cy == self.old_y and self.move:
@@ -224,15 +224,16 @@ class GameStrategy(object):
         dx = nx - cx
         dy = ny - cy
         
-        
-        if abs(dx) < 10 or abs(dy) < 10:
+        delta_limit = 10
+        print("X = {cx} + {dx} = {nx}; Y = {cy} + {dy} = {ny} | PX = {px}, PY = {py}".format(cx=cx, dx=dx, cy=cy, dy=dy, nx=nx, ny=ny, px=puck_x, py=puck_y))
+        if abs(dx) < delta_limit and abs(dy) < delta_limit:
             print("delta too small")
             return
         
         self.old_x = cx
         self.old_y = cy
         
-        print("X = {cx} + {dx} = {nx}; Y = {cy} + {dy} = {ny}".format(cx=cx, dx=dx, cy=cy, dy=dy, nx=nx, ny=ny))
+        
         
         self.robot.delta((dx, dy))
         self.move = True

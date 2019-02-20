@@ -23,8 +23,8 @@
 #define TIMER3_INTERRUPTS_ON    TIMSK3 |=  (1 << OCIE1A);
 #define TIMER3_INTERRUPTS_OFF   TIMSK3 &= ~(1 << OCIE1A);
 
-// #define STEPS_PER_MM 2.083333
-#define STEPS_PER_MM 1.8
+#define STEPS_PER_MM 2.083333
+// #define STEPS_PER_MM 1.8
 
 
 #define STOP 0
@@ -32,7 +32,7 @@
 #define RAMP_DOWN 2
 #define RUN 3
 
-#define START_INTERVAL 1600
-#define MAX_SPEED 150 // 40 max
+#define START_INTERVAL 2600
+#define MAX_SPEED 120 // 40 max
 
 #endif

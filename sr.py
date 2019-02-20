@@ -4,6 +4,7 @@ from serial import Serial
 
 ser = Serial('/dev/ttyUSB0', 115200)
 
+
 while 1:
     serial_line = ser.readline()
 

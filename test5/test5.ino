@@ -8,7 +8,7 @@ RampController1 stepper1;
 RampController2 stepper2;
 
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
-IPAddress ip(192, 168, 44, 5);
+IPAddress ip(192, 168, 44, 45);
 unsigned int localPort = 8888;
 EthernetUDP Udp;
 char packetBuffer[UDP_TX_PACKET_MAX_SIZE];
@@ -30,7 +30,7 @@ void setup() {
   TCNT1  = 0;
   OCR1A = 50;                             
   TCCR1B |= (1 << WGM12);
-  TCCR1B |= ((1 << CS11) | (1 << CS10));
+  TCCR1B |= ((1 << CS11) | (1 << CS10));  
 
   TCCR3A = 0;
   TCCR3B = 0;
@@ -59,7 +59,7 @@ ISR(TIMER3_COMPA_vect)
 void loop() {
   int packetSize = Udp.parsePacket();
   if (packetSize) {
-    Serial1.println("Received UDP packet");
+    // Serial1.println("Received UDP packet");
     Udp.read(packetBuffer, UDP_TX_PACKET_MAX_SIZE);
     JsonObject& root = jsonBuffer.parseObject(packetBuffer);
     if (root.success()) {
@@ -71,7 +71,7 @@ void loop() {
       stepper1.move(ds1);
       stepper2.move(ds2);
 
-      Serial1.println("Moving");
+      // Serial1.println("Moving");
     } else {
       Serial1.println("Failed to decode JSON");
     }

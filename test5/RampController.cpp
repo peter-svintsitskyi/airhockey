@@ -107,6 +107,7 @@ void RampController::onTimerTick() {
 }
 
 void RampController::move(long steps) {
+  disableTimerInterrupts();
   nextDir = steps > 0 ? 1 : -1;
   
   if (runningState != STOP && nextDir != 0 && nextDir != dir) {
@@ -118,11 +119,12 @@ void RampController::move(long steps) {
   } else {
     switch (runningState) {
       case STOP:
+        Serial1.println("Stop");
         setDirectionPin(steps < 0 ? HIGH : LOW);
         dir = steps > 0 ? 1 : -1;
         totalSteps = abs(steps);
         d = START_INTERVAL;
-        OCR1A = d;
+        setTimerInterval();
         stepCount = 0;
         n = 0;
         runningState = RAMP_UP;
@@ -137,6 +139,10 @@ void RampController::move(long steps) {
         totalSteps = abs(steps);
         stepCount = 0;
         runningState = RAMP_UP;
+        if (n == 0) {
+          d = START_INTERVAL;
+          setTimerInterval();
+        }
         
       break;
     }
