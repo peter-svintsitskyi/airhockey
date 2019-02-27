@@ -6,7 +6,7 @@ import time
 import socket
 import json
 from random import randint
-from threading import Thread
+from threading import Thread, Lock
 
 
 def get_intersect(a1, a2, b1, b2):
@@ -90,10 +90,6 @@ class ColorDetector(object):
         self.h_low = h_low
         self.h_high = h_high
         self.sv_low = sv_low
-        self.position = None
-        self.frame = None
-        self.stopped = False
-        self.mask = None
 
     def set_h_low(self, v):
         self.h_low = v
@@ -104,47 +100,25 @@ class ColorDetector(object):
     def set_sv_low(self, v):
         self.sv_low = v
 
-    def set_frame(self, frame):
-        self.frame = frame
 
-    def start(self):
-        t = Thread(target=self.detect_puck_position, args=())
-        t.daemon = True
-        t.start()
-        return self
+    def get_position(self, hsv):
+        # define range of blue color in HSV
+        lower_color = np.array([self.h_low, self.sv_low, self.sv_low])
+        upper_color = np.array([self.h_high, 255, 255])
 
-    def stop(self):
-        self.stopped = True
+        # Threshold the HSV image to get only blue colors
+        mask = cv2.inRange(hsv, lower_color, upper_color)
 
-    def detect_puck_position(self):
-        while True:
-            if self.frame is None:
-                time.sleep(0.1)
-                continue
+        _, contours, __ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
-            if self.stopped:
-                return
-
-            # Convert BGR to HSV
-            hsv = cv2.cvtColor(self.frame, cv2.COLOR_BGR2HSV)
-
-            # define range of blue color in HSV
-            lower_color = np.array([self.h_low, self.sv_low, self.sv_low])
-            upper_color = np.array([self.h_high, 255, 255])
-
-            # Threshold the HSV image to get only blue colors
-            mask = cv2.inRange(hsv, lower_color, upper_color)
-
-            self.mask = mask
-
-            _, contours, __ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-
-            if len(contours):
-                biggest_contour = max(contours, key=cv2.contourArea)
-                M = cv2.moments(biggest_contour)
-                cX = int(M["m10"] / (M["m00"] + 0.00001))
-                cY = int(M["m01"] / (M["m00"] + 0.00001))
-                self.position = (cX, cY)
+        if len(contours):
+            biggest_contour = max(contours, key=cv2.contourArea)
+            M = cv2.moments(biggest_contour)
+            cX = int(M["m10"] / (M["m00"] + 0.00001))
+            cY = int(M["m01"] / (M["m00"] + 0.00001))
+            return (cX, cY)
+            
+        return None
 
 
 class PuckInfo(object):
@@ -225,7 +199,7 @@ class GameStrategy(object):
         dy = ny - cy
         
         delta_limit = 10
-        print("X = {cx} + {dx} = {nx}; Y = {cy} + {dy} = {ny} | PX = {px}, PY = {py}".format(cx=cx, dx=dx, cy=cy, dy=dy, nx=nx, ny=ny, px=puck_x, py=puck_y))
+        #print("X = {cx} + {dx} = {nx}; Y = {cy} + {dy} = {ny} | PX = {px}, PY = {py}".format(cx=cx, dx=dx, cy=cy, dy=dy, nx=nx, ny=ny, px=puck_x, py=puck_y))
         if abs(dx) < delta_limit and abs(dy) < delta_limit:
             print("delta too small")
             return
@@ -342,9 +316,9 @@ class Debug(object):
                 cv2.line(frame, self.translator.w2f(robot_position), self.translator.w2f((int(rdX), int(rdY))), (0, 255, 0), 7) 
 
         cv2.putText(frame, str("FPS: {0:.2f}".format(fps)), (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), thickness=3)
-        cv2.putText(frame, str("Stream: {0}/{1:.2f} fps".format(video_stream.frames_read_from_stream, video_stream.stream_fps())), (10, 80),
+        cv2.putText(frame, str("Stream: {0}/{1:.2f} fps".format(video_stream.frames_grabbed, video_stream.stream_fps())), (10, 80),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), thickness=3)
-        cv2.putText(frame, str("Processed: {0}/{1:.2f} fps".format(video_stream.frames_processed, video_stream.processing_fps())), (10, 110),
+        cv2.putText(frame, str("Processed: {0}/{1:.2f} fps".format(video_stream.frames_read, video_stream.read_fps())), (10, 110),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), thickness=3)
         # debug
         #cv2.namedWindow('frame', cv2.WINDOW_NORMAL)
@@ -381,11 +355,12 @@ class VideoStream(object):
         self.stream = cv2.VideoCapture(path)
         self.stream.set(cv2.CAP_PROP_FRAME_WIDTH, frame_width)
         self.stream.set(cv2.CAP_PROP_FRAME_HEIGHT, frame_height)
+        self.stream.set(cv2.CAP_PROP_FPS, 30)
         self.stopped = False
-        self.frame = None
-        self.frames_read_from_stream = 0
-        self.frames_processed = 0
+        self.frames_grabbed = 0
+        self.frames_read = 0
         self.time_started = time.time()
+        self.has_grabbed_frame = False
 
     def get_real_frame_size(self):
         return self.stream.get(cv2.CAP_PROP_FRAME_WIDTH), self.stream.get(cv2.CAP_PROP_FRAME_HEIGHT)
@@ -401,32 +376,28 @@ class VideoStream(object):
             if self.stopped:
                 return
 
-            (grabbed, frame) = self.stream.read()
-
-            if not grabbed:
-                self.stop()
-                return
-
-            self.frame = frame
-            self.frames_read_from_stream += 1
+            self.has_grabbed_frame = self.stream.grab()
+            if self.has_grabbed_frame:
+                self.frames_grabbed += 1
 
     def read(self):
-        self.frames_processed += 1
-        return self.frame
+        ok, frame = self.stream.retrieve()
+        self.frames_read += 1
+        return frame
 
     def has_frame(self):
         # return True if there are still frames in the queue
-        return self.frame is not None
+        return self.has_grabbed_frame
 
     def stop(self):
         # indicate that the thread should be stopped
         self.stopped = True
 
     def stream_fps(self):
-        return self.frames_read_from_stream / (time.time() - self.time_started)
+        return self.frames_grabbed / (time.time() - self.time_started)
 
-    def processing_fps(self):
-        return self.frames_processed / (time.time() - self.time_started)
+    def read_fps(self):
+        return self.frames_read / (time.time() - self.time_started)
 
 
 if __name__ == '__main__':
@@ -472,21 +443,18 @@ if __name__ == '__main__':
     while not video_stream.has_frame():
         time.sleep(0.1)
 
-    puck_detector.start()
-    robot_detector.start()
-
-    frame_throttler = FrameThrottler(desired_fps=500)
-    with Robot("192.168.44.5", 8888) as robot:
+    # frame_throttler = FrameThrottler(desired_fps=500)
+    with Robot("192.168.44.45", 8888) as robot:
 
         game_strategy = GameStrategy(world, robot)
 
         while video_stream.has_frame():
-            frame_throttler.throttle()
+            # frame_throttler.throttle()
             frame = video_stream.read()
-            puck_detector.set_frame(frame)
-            robot_detector.set_frame(frame)
-
-            puck_position = puck_detector.position
+            
+            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)            
+            
+            puck_position = puck_detector.get_position(hsv)
 
             if puck_position is not None:
                 puck_position = translator.f2w(puck_position)
@@ -498,16 +466,15 @@ if __name__ == '__main__':
             else:
                 print('Puck not found')
 
-            # 
 
-            robot_position = robot_detector.position
+            robot_position = robot_detector.get_position(hsv)
             if robot_position is not None:
                 robot_position = translator.f2w(robot_position)
 
             debug.draw(frame=frame.copy(), world_debug=world.get_debug(),
                        robot_position=robot_position,
                        robot_delta=robot.last_delta,
-                       fps=frame_throttler.fps,
+                       fps=0,
                        video_stream=video_stream)
 
             game_strategy.tick(robot_position=robot_position)
@@ -522,9 +489,7 @@ if __name__ == '__main__':
             if k == 27:
                 break
 
-    print(frame_throttler.fps)
+    # print(frame_throttler.fps)
 
     cv2.destroyAllWindows()
-    puck_detector.stop()
-    robot_detector.stop()
     video_stream.stop()
