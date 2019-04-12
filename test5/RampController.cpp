@@ -73,8 +73,8 @@ void RampController::onTimerTick() {
 
       } else {
         disableTimerInterrupts();
-        Serial1.print("Stopped at: ");
-        Serial1.println(stepPosition);    
+        //Serial1.print("Stopped at: ");
+        //Serial1.println(stepPosition);    
       }
     break;
     
@@ -92,6 +92,11 @@ void RampController::onTimerTick() {
     break;
 
     case RUN:
+
+      if (stepCount < totalSteps - n) {
+        Serial1.println("!!!! ! ! ! ! MUST STOP !!!! ! ! ");
+      }
+    
       if ( stepCount == totalSteps - n ) { // switch to the ramp down phase
         runningState = RAMP_DOWN;  
       }
@@ -124,7 +129,7 @@ void RampController::move(long steps) {
   } else {
     switch (runningState) {
       case STOP:
-        Serial1.println("Stop");
+        //Serial1.println("Stop");
         setDirectionPin(steps < 0 ? HIGH : LOW);
         dir = steps > 0 ? 1 : -1;
         totalSteps = abs(steps);

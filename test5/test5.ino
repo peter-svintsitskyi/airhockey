@@ -1,6 +1,5 @@
 #include <Ethernet.h>
 #include <EthernetUdp.h>
-#include <ArduinoJson.h>
 #include "RampController.h"
 #include "definitions.h"
 
@@ -11,8 +10,6 @@ byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 IPAddress ip(192, 168, 44, 45);
 unsigned int localPort = 8888;
 EthernetUDP Udp;
-char packetBuffer[UDP_TX_PACKET_MAX_SIZE];
-StaticJsonBuffer<200> jsonBuffer;
 
 void setup() {
   Ethernet.begin(mac, ip);
@@ -56,26 +53,34 @@ ISR(TIMER3_COMPA_vect)
   stepper2.onTimerTick();
 }
 
+typedef struct __attribute__((packed)) _UDPPacketType {
+  int16_t dx;
+  int16_t dy;
+  unsigned long counter;
+} UDPPacketType;
+
+union {
+  UDPPacketType packet;
+  unsigned char buffer[sizeof(UDPPacketType)];
+} UDPPacket;
+
 void loop() {
   int packetSize = Udp.parsePacket();
   if (packetSize) {
     // Serial1.println("Received UDP packet");
-    Udp.read(packetBuffer, UDP_TX_PACKET_MAX_SIZE);
-    JsonObject& root = jsonBuffer.parseObject(packetBuffer);
-    if (root.success()) {
-      double dX = root["x"].as<double>();
-      double dY = root["y"].as<double>();
-      double ds1 = (dY + dX) * STEPS_PER_MM;
-      double ds2 = (dY - dX) * STEPS_PER_MM;
+    Udp.read(UDPPacket.buffer, 4);
 
-      stepper1.move(ds1);
-      stepper2.move(ds2);
+//    Serial1.print("Got packet: ");
+//    Serial1.print(UDPPacket.packet.dx);
+//    Serial1.print(", ");
+//    Serial1.println(UDPPacket.packet.dy);
+//    Serial1.println(UDPPacket.packet.counter);
+    
+    double ds1 = (UDPPacket.packet.dy + UDPPacket.packet.dx) * STEPS_PER_MM;
+    double ds2 = (UDPPacket.packet.dy - UDPPacket.packet.dx) * STEPS_PER_MM;
 
-      // Serial1.println("Moving");
-    } else {
-      Serial1.println("Failed to decode JSON");
-    }
-
-    jsonBuffer.clear();
+    stepper2.move(ds2);
+    stepper1.move(ds1);
+    
   }
 }

@@ -24,7 +24,7 @@
 #define TIMER3_INTERRUPTS_OFF   TIMSK3 &= ~(1 << OCIE1A);
 
 // #define STEPS_PER_MM 2.083333
-#define STEPS_PER_MM 1.0
+#define STEPS_PER_MM 1.5
 
 #define STOP 0
 #define RAMP_UP 1
