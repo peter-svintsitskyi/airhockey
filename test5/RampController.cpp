@@ -8,6 +8,17 @@ inline void RampController1::setTimerInterval() {
 
 inline void RampController1::stepPulse() {
   STEPPER1_HIGH;
+  __asm__ __volatile__ (
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop");  // Wait for step pulse
   STEPPER1_LOW;
 }
 
@@ -25,24 +36,35 @@ inline void RampController1::setDirectionPin(unsigned char value) {
 
 // ================== STEPPER 2 ==============================
 
-void RampController2::setTimerInterval() {
+inline void RampController2::setTimerInterval() {
   OCR3A = d;
 }
 
-void RampController2::stepPulse() {
+inline void RampController2::stepPulse() {
   STEPPER2_HIGH;
+  __asm__ __volatile__ (
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop" "\n\t"
+    "nop");  // Wait for step pulse
   STEPPER2_LOW;
 }
 
-void RampController2::disableTimerInterrupts() {
+inline void RampController2::disableTimerInterrupts() {
   TIMER3_INTERRUPTS_OFF
 }
 
-void RampController2::enableTimerInterrupts() {
+inline void RampController2::enableTimerInterrupts() {
   TIMER3_INTERRUPTS_ON
 }
 
-void RampController2::setDirectionPin(unsigned char value) {
+inline void RampController2::setDirectionPin(unsigned char value) {
   digitalWrite(STEPPER2_DIR_PIN, value);
 }
 
@@ -92,12 +114,7 @@ void RampController::onTimerTick() {
     break;
 
     case RUN:
-
-      if (stepCount < totalSteps - n) {
-        Serial1.println("!!!! ! ! ! ! MUST STOP !!!! ! ! ");
-      }
-    
-      if ( stepCount == totalSteps - n ) { // switch to the ramp down phase
+      if ( stepCount >= totalSteps - n ) { // switch to the ramp down phase
         runningState = RAMP_DOWN;  
       }
     break;
@@ -142,16 +159,26 @@ void RampController::move(long steps) {
   
       case RAMP_UP:
       case RUN:
-        totalSteps = abs(steps);
-        stepCount = 0;
+
+        if (totalSteps < abs(steps)) {
+          // Serial1.println("Need slow down?");
+        } else {
+      
+          totalSteps = abs(steps);
+          stepCount = 0;
+        }
       
       case RAMP_DOWN:
-        totalSteps = abs(steps);
-        stepCount = 0;
-        runningState = RAMP_UP;
-        if (n == 0) {
-          d = START_INTERVAL;
-          setTimerInterval();
+        if (totalSteps < abs(steps)) {
+          // Serial1.println("Need go back after full stop?");
+        } else {
+          totalSteps = abs(steps);
+          stepCount = 0;
+          runningState = RAMP_UP;
+          if (n == 0) {
+            d = START_INTERVAL;
+            setTimerInterval();
+          }
         }
         
       break;
