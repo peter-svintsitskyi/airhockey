@@ -14,6 +14,7 @@ class RampController {
     volatile unsigned long totalSteps = 0;
     volatile int stepPosition = 0;
     volatile unsigned char runningState = STOP;
+    volatile double velocityFactor = 1.0;
   
     virtual void setTimerInterval() = 0;
     virtual void stepPulse() = 0;
@@ -23,7 +24,9 @@ class RampController {
 
   public:
     void onTimerTick();
-    void move(long steps);
+    void move(int steps);
+    int estimateStepsToGo(int steps);
+    void setVelocityFactor(double factor);
 };
 
 class RampController1: public RampController {

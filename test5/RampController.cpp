@@ -3,7 +3,7 @@
 // ================== STEPPER 1 ==============================
 
 inline void RampController1::setTimerInterval() {
-  OCR1A = d;
+  OCR1A = d * velocityFactor;
 }
 
 inline void RampController1::stepPulse() {
@@ -128,7 +128,17 @@ void RampController::onTimerTick() {
   setTimerInterval();  
 }
 
-void RampController::move(long steps) {
+int RampController::estimateStepsToGo(int steps) {
+  char newDir = steps > 0 ? 1 : -1;
+  
+  if (runningState != STOP && newDir != dir) {
+    return n + abs(steps);
+  }
+
+  return abs(steps);
+}
+
+void RampController::move(int steps) {
   if (steps == 0) {
     return;
   }
@@ -187,3 +197,8 @@ void RampController::move(long steps) {
   
   enableTimerInterrupts();
 }
+
+void RampController::setVelocityFactor(double factor) {
+  velocityFactor = factor;
+}
+

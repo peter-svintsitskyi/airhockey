@@ -113,7 +113,24 @@ void loop() {
     if (UDPPacket.packet.type == 1) {
       double ds1 = (UDPPacket.packet.dy + UDPPacket.packet.dx) * STEPS_PER_MM;
       double ds2 = (UDPPacket.packet.dy - UDPPacket.packet.dx) * STEPS_PER_MM;
-  
+
+      int stepper1ETASteps = stepper1.estimateStepsToGo(ds1);
+      int stepper2ETASteps = stepper2.estimateStepsToGo(ds2);
+
+      double velocityFactor = stepper1ETASteps / stepper2ETASteps;
+      double stepper1VelocityFactor = 1.0;
+      double stepper2VelocityFactor = 1.0;
+
+      stepper1.setVelocityFactor(1.0);
+      stepper2.setVelocityFactor(1.0);
+      
+      if (stepper1ETASteps > stepper2ETASteps) {
+        stepper2.setVelocityFactor(1.0 / velocityFactor);
+        
+      } else {
+        stepper1.setVelocityFactor(velocityFactor);
+      }
+      
       stepper2.move(ds2);
       stepper1.move(ds1);
     }
