@@ -90,6 +90,7 @@ class ColorDetector(object):
         self.h_low = h_low
         self.h_high = h_high
         self.sv_low = sv_low
+        self.mask = None
 
     def set_h_low(self, v):
         self.h_low = v
@@ -107,9 +108,9 @@ class ColorDetector(object):
         upper_color = np.array([self.h_high, 255, 255])
 
         # Threshold the HSV image to get only blue colors
-        mask = cv2.inRange(hsv, lower_color, upper_color)
+        self.mask = cv2.inRange(hsv, lower_color, upper_color)
 
-        _, contours, __ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        contours, _ = cv2.findContours(self.mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
         if len(contours):
             biggest_contour = max(contours, key=cv2.contourArea)
@@ -357,18 +358,21 @@ class VideoStream(object):
         self.stream.set(cv2.CAP_PROP_FRAME_HEIGHT, frame_height)
         self.stream.set(cv2.CAP_PROP_FPS, 30)
         self.stopped = False
+        self.frame = None
         self.frames_grabbed = 0
         self.frames_read = 0
         self.time_started = time.time()
         self.has_grabbed_frame = False
+        self.read_lock = Lock()
 
     def get_real_frame_size(self):
         return self.stream.get(cv2.CAP_PROP_FRAME_WIDTH), self.stream.get(cv2.CAP_PROP_FRAME_HEIGHT)
 
-    def start(self):
+    def start(self):        
         t = Thread(target=self.update, args=())
         t.daemon = True
         t.start()
+        self.time_started = time.time()
         return self
 
     def update(self):
@@ -376,13 +380,19 @@ class VideoStream(object):
             if self.stopped:
                 return
 
-            self.has_grabbed_frame = self.stream.grab()
-            if self.has_grabbed_frame:
-                self.frames_grabbed += 1
+            self.has_grabbed_frame, frame = self.stream.read()
+
+            with self.read_lock:
+                self.frame = frame
+
+            self.frames_grabbed += 1
 
     def read(self):
-        ok, frame = self.stream.retrieve()
+        with self.read_lock:
+            frame = self.frame.copy()
+
         self.frames_read += 1
+
         return frame
 
     def has_frame(self):
@@ -402,9 +412,12 @@ class VideoStream(object):
 
 if __name__ == '__main__':
 
-    PUCK_H_LOW = 90
-    PUCK_H_HIGH = 110
-    PUCK_SV_LOW = 50
+    # PUCK_H_LOW = 90
+    PUCK_H_LOW = 65
+    # PUCK_H_HIGH = 110
+    PUCK_H_HIGH = 78
+    # PUCK_SV_LOW = 50
+    PUCK_SV_LOW = 102
     puck_detector = ColorDetector(h_low=PUCK_H_LOW, h_high=PUCK_H_HIGH, sv_low=PUCK_SV_LOW)
 
     ROBOT_H_LOW = 20
@@ -457,25 +470,25 @@ if __name__ == '__main__':
             puck_position = puck_detector.get_position(hsv)
 
             if puck_position is not None:
-                puck_position = translator.f2w(puck_position)
-                track = tracker.direction(*puck_position)
-                if track is not None:
-                    vector, velocity = track
-                    world.tick(PuckInfo(puck_position, vector, velocity))
+               puck_position = translator.f2w(puck_position)
+               track = tracker.direction(*puck_position)
+               if track is not None:
+                   vector, velocity = track
+                   world.tick(PuckInfo(puck_position, vector, velocity))
 
             else:
-                print('Puck not found')
+               print('Puck not found')
 
 
             robot_position = robot_detector.get_position(hsv)
             if robot_position is not None:
-                robot_position = translator.f2w(robot_position)
+               robot_position = translator.f2w(robot_position)
 
             debug.draw(frame=frame.copy(), world_debug=world.get_debug(),
-                       robot_position=robot_position,
-                       robot_delta=robot.last_delta,
-                       fps=0,
-                       video_stream=video_stream)
+                      robot_position=robot_position,
+                      robot_delta=robot.last_delta,
+                      fps=0,
+                      video_stream=video_stream)
 
             game_strategy.tick(robot_position=robot_position)
 
