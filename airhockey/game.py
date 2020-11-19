@@ -3,11 +3,11 @@ import numpy as np
 from sklearn import preprocessing
 import math
 import time
-import socket
 import json
 from random import randint
 from threading import Thread, Lock
-
+from vision import VideoStream, ScreenCapture
+from robot import Robot
 
 def get_intersect(a1, a2, b1, b2):
     """ 
@@ -49,7 +49,7 @@ class Tracker(object):
             np.asarray([dx, dy]).reshape(1, -1)
         )
 
-        if velocity_square > 100:
+        if velocity_square > 3000:
             self.old_vector = vector[0]
             self.x = x
             self.y = y
@@ -129,25 +129,6 @@ class PuckInfo(object):
         self.position = position
 
 
-class Robot(object):
-    def __init__(self, host, port):
-        self.host = host
-        self.port = port
-        self.last_delta = None
-
-    def __enter__(self):
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)        
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.sock.close()
-
-    def delta(self, delta):
-        x, y = delta
-        self.last_delta = delta
-        self.sock.sendto(bytes('{{"x":{x},"y":{y}}}\n'.format(x=x, y=y), "utf-8"), (self.host, self.port))
-        
-
 class GameStrategy(object):
     def __init__(self, world, robot):
         self.world = world
@@ -156,61 +137,42 @@ class GameStrategy(object):
         self.old_x = None
         self.old_y = None
 
+
     def tick(self, *, robot_position):
         if robot_position is None:
             return
-            
+
+        robot_x, robot_y = robot_position
+        self.old_x = robot_x
+        self.old_y = robot_y
+        # print("Robot position: {x}, {y}".format(x=cx, y=cy))
+
         if self.world.puck_info is None:
             return
-            
-        # if len(self.world.trajectory) == 0:
-        #    return
+        puck_x, puck_y = world.puck_info.position
+
+        dx = puck_x - robot_x
+        dy = puck_y - robot_y
+
+        distance_to_puck = math.sqrt(pow(dx, 2) + pow(dy, 2))
+        # print(distance_to_puck)
+        if (distance_to_puck < 200):
+            self.robot.move((int(robot_x + dx * 4), int(robot_y + dy * 4)))
+            self.move = True
+
+        if len(self.world.trajectory) == 0:
+           return
+
+        index = 0
+#         if len(self.world.trajectory) == 1:
+#             index = 0
 
         # index = randint(0, len(self.world.trajectory) - 1)
+        
+        point, eta = self.world.trajectory[index]
+        nx, ny = point
 
-        # point, eta = self.world.trajectory[index]
-        
-        cx, cy = robot_position
-        
-        puck_x, puck_y = world.puck_info.position
-        
-        if puck_x < 600 or puck_x > 1200 or puck_y < 0 or puck_y > 600:
-            print("puck is out of field | PX = {px}, PY = {py}".format(px=puck_x, py=puck_y))
-            return   
-        
-        # if cx == self.old_x and cy == self.old_y and self.move:
-        #    self.move = False
-            
-        #    print("robot finished move")
-        #    return
-        
-        if cx < 0 or cx > 600 or cy < 0 or cy > 600:
-            print("robot current position is out of field")            
-            return
-                     
-        # e = 10   
-        # nx = randint(45 + e, 555 - e)
-        # ny = randint(45 + e, 555 - e)
-        
-        nx = 1200 - puck_x
-        ny = puck_y
-
-
-        dx = nx - cx
-        dy = ny - cy
-        
-        delta_limit = 10
-        #print("X = {cx} + {dx} = {nx}; Y = {cy} + {dy} = {ny} | PX = {px}, PY = {py}".format(cx=cx, dx=dx, cy=cy, dy=dy, nx=nx, ny=ny, px=puck_x, py=puck_y))
-        if abs(dx) < delta_limit and abs(dy) < delta_limit:
-            print("delta too small")
-            return
-        
-        self.old_x = cx
-        self.old_y = cy
-        
-        
-        
-        self.robot.delta((dx, dy))
+        self.robot.move((int(nx), int(ny)))
         self.move = True
         
         
@@ -232,7 +194,7 @@ class World(object):
         if self.puck_info.vector[0] > 0:
             return
 
-        for x in range(0, int(self.puck_info.position[0] / 2), 100):
+        for x in range(100, int(self.puck_info.position[0] / 2), 100):
             intersection = self.intersect_puck_trajectory_at_x(x)
             if intersection is not None:
                 self.trajectory.append(intersection)
@@ -280,7 +242,7 @@ class Debug(object):
     def __init__(self, translator):
         self.translator = translator
 
-    def draw(self, *, frame, world_debug, robot_position, robot_delta, fps, video_stream):
+    def draw(self, *, frame, world_debug, robot_position, robot_dst, fps, video_stream):
         # table
         cv2.rectangle(frame, translator.w2f((0, 0)), translator.w2f(world_debug['table_size']), (0, 255, 255), 2)
 
@@ -301,20 +263,18 @@ class Debug(object):
             cX, cY = self.translator.w2f(world_debug['puck_info'].position)
             vX, vY = world_debug['puck_info'].vector
             velocity = world_debug['puck_info'].velocity
-            line_len = 0
-            if velocity > 10:
-                line_len = velocity * 2
+            line_len = 200
+#             if velocity > 10:
+#                 line_len = velocity * 2
             cv2.line(frame, (cX, cY), (int(cX + vX * line_len), int(cY + vY * line_len)), (0, 255, 0), 7)
 
         # robot position
         if robot_position is not None:
             cv2.circle(frame, self.translator.w2f(robot_position), 10, (255, 0, 255), -1)
-            if robot_delta is not None:
+            if robot.destination is not None:
                 (rX, rY) = robot_position
-                (dX, dY) = robot_delta
-                rdX = rX + dX
-                rdY = rY + dY             
-                cv2.line(frame, self.translator.w2f(robot_position), self.translator.w2f((int(rdX), int(rdY))), (0, 255, 0), 7) 
+                (rdX, rdY) = robot_dst
+                cv2.line(frame, self.translator.w2f(robot_position), self.translator.w2f((int(rdX), int(rdY))), (0, 255, 0), 7)
 
         cv2.putText(frame, str("FPS: {0:.2f}".format(fps)), (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), thickness=3)
         cv2.putText(frame, str("Stream: {0}/{1:.2f} fps".format(video_stream.frames_grabbed, video_stream.stream_fps())), (10, 80),
@@ -327,93 +287,11 @@ class Debug(object):
         cv2.imshow('frame', frame)
 
 
-class FrameThrottler(object):
-    def __init__(self, desired_fps):
-        self.desired_fps = desired_fps
-        self.last_frame_time = None
-        self.fps = 0
-        self.start = time.time()
-        self.number_of_frames = 0
-
-    def throttle(self):
-        if self.last_frame_time is None:
-            self.last_frame_time = time.time()
-
-        self.number_of_frames += 1
-
-        diff = time.time() - self.last_frame_time
-        if diff < 1 / self.desired_fps:
-            time.sleep(1 / self.desired_fps - diff)
-
-        self.last_frame_time = time.time()
-
-        self.fps = self.number_of_frames / (self.last_frame_time - self.start)
-
-
-class VideoStream(object):
-    def __init__(self, path, frame_dimensions):
-        frame_width, frame_height = frame_dimensions
-        self.stream = cv2.VideoCapture(path)
-        self.stream.set(cv2.CAP_PROP_FRAME_WIDTH, frame_width)
-        self.stream.set(cv2.CAP_PROP_FRAME_HEIGHT, frame_height)
-        self.stream.set(cv2.CAP_PROP_FPS, 30)
-        self.stopped = False
-        self.frame = None
-        self.frames_grabbed = 0
-        self.frames_read = 0
-        self.time_started = time.time()
-        self.has_grabbed_frame = False
-        self.read_lock = Lock()
-
-    def get_real_frame_size(self):
-        return self.stream.get(cv2.CAP_PROP_FRAME_WIDTH), self.stream.get(cv2.CAP_PROP_FRAME_HEIGHT)
-
-    def start(self):        
-        t = Thread(target=self.update, args=())
-        t.daemon = True
-        t.start()
-        self.time_started = time.time()
-        return self
-
-    def update(self):
-        while True:
-            if self.stopped:
-                return
-
-            self.has_grabbed_frame, frame = self.stream.read()
-
-            with self.read_lock:
-                self.frame = frame
-
-            self.frames_grabbed += 1
-
-    def read(self):
-        with self.read_lock:
-            frame = self.frame.copy()
-
-        self.frames_read += 1
-
-        return frame
-
-    def has_frame(self):
-        # return True if there are still frames in the queue
-        return self.has_grabbed_frame
-
-    def stop(self):
-        # indicate that the thread should be stopped
-        self.stopped = True
-
-    def stream_fps(self):
-        return self.frames_grabbed / (time.time() - self.time_started)
-
-    def read_fps(self):
-        return self.frames_read / (time.time() - self.time_started)
-
 
 if __name__ == '__main__':
 
     # PUCK_H_LOW = 90
-    PUCK_H_LOW = 65
+    PUCK_H_LOW = 50
     # PUCK_H_HIGH = 110
     PUCK_H_HIGH = 78
     # PUCK_SV_LOW = 50
@@ -441,9 +319,9 @@ if __name__ == '__main__':
     cv2.setTrackbarPos('Robot SV Low', 'frame', ROBOT_SV_LOW)
 
     table_size = (1200, 600)
-    video_stream = VideoStream(0, (640, 480))
-    frame_size = video_stream.get_real_frame_size()
-    print('camera resolution {w}:{h}'.format(w=frame_size[0], h=frame_size[1]))
+    frame_size = (1024, 768)
+    # video_stream = VideoStream(0, frame_size)
+    video_stream = ScreenCapture(frame_size)
 
     translator = WorldToFrameTranslator(frame_size, table_size)
 
@@ -457,7 +335,7 @@ if __name__ == '__main__':
         time.sleep(0.1)
 
     # frame_throttler = FrameThrottler(desired_fps=500)
-    with Robot("192.168.44.45", 8888) as robot:
+    with Robot("localhost", 8081) as robot:
 
         game_strategy = GameStrategy(world, robot)
 
@@ -477,7 +355,8 @@ if __name__ == '__main__':
                    world.tick(PuckInfo(puck_position, vector, velocity))
 
             else:
-               print('Puck not found')
+                pass
+                # print('Puck not found')
 
 
             robot_position = robot_detector.get_position(hsv)
@@ -486,17 +365,17 @@ if __name__ == '__main__':
 
             debug.draw(frame=frame.copy(), world_debug=world.get_debug(),
                       robot_position=robot_position,
-                      robot_delta=robot.last_delta,
+                      robot_dst=robot.destination,
                       fps=0,
                       video_stream=video_stream)
 
             game_strategy.tick(robot_position=robot_position)
 
             #if puck_detector.mask is not None:
-            #    cv2.imshow('puck mask', puck_detector.mask)
+            #   cv2.imshow('puck mask', puck_detector.mask)
             
             #if robot_detector.mask is not None:
-            #    cv2.imshow('robot mask', robot_detector.mask)
+            #   cv2.imshow('robot mask', robot_detector.mask)
 
             k = cv2.waitKey(5) & 0xFF
             if k == 27:
