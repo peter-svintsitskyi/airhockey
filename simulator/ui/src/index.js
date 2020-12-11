@@ -81,6 +81,17 @@ Application((app) => {
     userData: 'pusher'
   };
 
+  const markerRender = {fill: '#00fff0', stroke: '#00ffff'}
+
+  const marker1 = world.createKinematicBody(Vec2(-2, 3 + RAIL_W / 2), 0)
+  marker1.createFixture(pl.Circle(RAIL_W / 2), {});
+  marker1.render = markerRender
+
+  const marker2 = world.createKinematicBody(Vec2(-2, -3 - RAIL_W / 2), 0)
+  marker2.createFixture(pl.Circle(RAIL_W / 2), {});
+  marker2.render = markerRender
+
+
   world.createBody().createFixture(pl.Polygon(railV.map(Vec2.scaleFn(+1, +1))), railFixDef);
   world.createBody().createFixture(pl.Polygon(railV.map(Vec2.scaleFn(-1, +1))), railFixDef);
   world.createBody().createFixture(pl.Polygon(railV.map(Vec2.scaleFn(+1, -1))), railFixDef);

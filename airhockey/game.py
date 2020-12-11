@@ -6,8 +6,12 @@ import time
 import json
 from random import randint
 from threading import Thread, Lock
-from vision import VideoStream, ScreenCapture
-from robot import Robot
+from airhockey.vision.video import VideoStream, ScreenCapture
+from airhockey.vision.color import ColorDetector
+from airhockey.robot import Robot
+from airhockey.debug import Debug
+from airhockey.tracker import Tracker
+from airhockey.translate import WorldToFrameTranslator
 
 def get_intersect(a1, a2, b1, b2):
     """ 
@@ -27,99 +31,6 @@ def get_intersect(a1, a2, b1, b2):
         return (float('inf'), float('inf'))
 
     return (x / z, y / z)
-
-
-class Tracker(object):
-    x = None
-    y = None
-    old_vector = None
-
-    def direction(self, x, y):
-        if self.x is None:
-            self.x = x
-            self.y = y
-            return None
-
-        dx = x - self.x
-        dy = y - self.y
-
-        velocity_square = dx * dx + dy * dy
-
-        vector = preprocessing.normalize(
-            np.asarray([dx, dy]).reshape(1, -1)
-        )
-
-        if velocity_square > 3000:
-            self.old_vector = vector[0]
-            self.x = x
-            self.y = y
-
-        if self.old_vector is None:
-            return None
-
-        return self.old_vector, math.sqrt(velocity_square)
-
-
-class WorldToFrameTranslator(object):
-    def __init__(self, frame_size, table_size):
-        self.frame_width, self.frame_height = frame_size
-        self.table_width, self.table_height = table_size
-        self.horizontal_margin = 10
-        frame_field_width = self.frame_width - self.horizontal_margin * 2
-        frame_field_height = frame_field_width / 2
-        self.vertical_margin = (self.frame_height - frame_field_height) / 2
-
-        self.horizontal_ratio = self.table_width / frame_field_width
-        self.vertical_ratio = self.table_height / frame_field_height
-
-    def w2f(self, point):
-        pX, pY = point
-
-        return int(pX / self.horizontal_ratio + self.horizontal_margin), int(
-            pY / self.vertical_ratio + self.vertical_margin)
-
-    def f2w(self, point):
-        pX, pY = point
-
-        return int((pX - self.horizontal_margin) * self.horizontal_ratio), int(
-            (pY - self.vertical_margin) * self.vertical_ratio)
-
-
-class ColorDetector(object):
-    def __init__(self, *, h_low, h_high, sv_low):
-        self.h_low = h_low
-        self.h_high = h_high
-        self.sv_low = sv_low
-        self.mask = None
-
-    def set_h_low(self, v):
-        self.h_low = v
-
-    def set_h_high(self, v):
-        self.h_high = v
-
-    def set_sv_low(self, v):
-        self.sv_low = v
-
-
-    def get_position(self, hsv):
-        # define range of blue color in HSV
-        lower_color = np.array([self.h_low, self.sv_low, self.sv_low])
-        upper_color = np.array([self.h_high, 255, 255])
-
-        # Threshold the HSV image to get only blue colors
-        self.mask = cv2.inRange(hsv, lower_color, upper_color)
-
-        contours, _ = cv2.findContours(self.mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-
-        if len(contours):
-            biggest_contour = max(contours, key=cv2.contourArea)
-            M = cv2.moments(biggest_contour)
-            cX = int(M["m10"] / (M["m00"] + 0.00001))
-            cY = int(M["m01"] / (M["m00"] + 0.00001))
-            return (cX, cY)
-            
-        return None
 
 
 class PuckInfo(object):
@@ -174,8 +85,7 @@ class GameStrategy(object):
 
         self.robot.move((int(nx), int(ny)))
         self.move = True
-        
-        
+
 
 class World(object):
     def __init__(self, table_size):
@@ -238,58 +148,7 @@ class World(object):
         )
 
 
-class Debug(object):
-    def __init__(self, translator):
-        self.translator = translator
-
-    def draw(self, *, frame, world_debug, robot_position, robot_dst, fps, video_stream):
-        # table
-        cv2.rectangle(frame, translator.w2f((0, 0)), translator.w2f(world_debug['table_size']), (0, 255, 255), 2)
-
-        # trajectory
-        for intersection in world_debug['trajectory']:
-            point, velocity = intersection
-            cv2.circle(frame, translator.w2f(point), 10, (0, 0, 255), -1)
-            # cv2.putText(frame, str(velocity), translator.w2f(point), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 127, 255), thickness=3)
-
-        # puck center
-        if world_debug['puck_info'] is not None:
-            cv2.circle(
-                frame,
-                self.translator.w2f(world_debug['puck_info'].position),
-                10, (255, 0, 0), -1)
-
-            # puck vector
-            cX, cY = self.translator.w2f(world_debug['puck_info'].position)
-            vX, vY = world_debug['puck_info'].vector
-            velocity = world_debug['puck_info'].velocity
-            line_len = 200
-#             if velocity > 10:
-#                 line_len = velocity * 2
-            cv2.line(frame, (cX, cY), (int(cX + vX * line_len), int(cY + vY * line_len)), (0, 255, 0), 7)
-
-        # robot position
-        if robot_position is not None:
-            cv2.circle(frame, self.translator.w2f(robot_position), 10, (255, 0, 255), -1)
-            if robot.destination is not None:
-                (rX, rY) = robot_position
-                (rdX, rdY) = robot_dst
-                cv2.line(frame, self.translator.w2f(robot_position), self.translator.w2f((int(rdX), int(rdY))), (0, 255, 0), 7)
-
-        cv2.putText(frame, str("FPS: {0:.2f}".format(fps)), (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), thickness=3)
-        cv2.putText(frame, str("Stream: {0}/{1:.2f} fps".format(video_stream.frames_grabbed, video_stream.stream_fps())), (10, 80),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), thickness=3)
-        cv2.putText(frame, str("Processed: {0}/{1:.2f} fps".format(video_stream.frames_read, video_stream.read_fps())), (10, 110),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), thickness=3)
-        # debug
-        #cv2.namedWindow('frame', cv2.WINDOW_NORMAL)
-        cv2.resizeWindow('frame', 600, 600)
-        cv2.imshow('frame', frame)
-
-
-
-if __name__ == '__main__':
-
+def run():
     # PUCK_H_LOW = 90
     PUCK_H_LOW = 50
     # PUCK_H_HIGH = 110
@@ -327,7 +186,6 @@ if __name__ == '__main__':
 
     tracker = Tracker()
     world = World(table_size)
-    debug = Debug(translator)
 
     video_stream.start()
 
@@ -336,6 +194,7 @@ if __name__ == '__main__':
 
     # frame_throttler = FrameThrottler(desired_fps=500)
     with Robot("localhost", 8081) as robot:
+        debug = Debug(translator, robot)
 
         game_strategy = GameStrategy(world, robot)
 
