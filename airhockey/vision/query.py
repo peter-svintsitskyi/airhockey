@@ -62,8 +62,6 @@ class QueryContext(object):
     def __enter__(self):
         self.frame = self.frame_reader.read()
         self.frame_hsv = cv2.cvtColor(self.frame, cv2.COLOR_BGR2HSV)
-        kernel = np.ones((5, 5), np.uint8)
-        # self.frame_hsv = cv2.dilate(self.frame_hsv, kernel, iterations=1)
         self.queries = []
         if self.debug_window is not None:
             self.debug_window.set_frame(self.frame, self.frame_hsv)
