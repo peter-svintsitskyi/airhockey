@@ -59,17 +59,14 @@ class TestCalibrateHandler(unittest.TestCase):
             ],
             self.log_spy.messages
         )
-        self.assertEqual(3, self.frame_reader.read.call_count)
-        self.assertEqual(3, self.query_context.query.call_count)
+        self.assertGreater(self.frame_reader.read.call_count, 3)
+        self.assertGreater(self.query_context.query.call_count, 3)
         self.query_context.query.assert_called_with(expected_query)
 
-    @patch('time.sleep', return_value=None)
-    def test_can_configure_number_of_retries_and_delay(self, patched_time_sleep):
-        self.make_calibrate_handler(tries=2, delay=5)
+    def test_can_configure_number_of_retries_and_delay(self):
+        self.make_calibrate_handler(tries=2, delay=0.01)
         self.query_context.query = MagicMock(return_value=VerifyPositionQuery.NOT_DETECTED)
         self.assertEqual(CalibrateHandler.FAIL, self.calibrate_handler())
-        self.assertEqual(1, patched_time_sleep.call_count)
-        patched_time_sleep.assert_called_with(5)
         self.assertListEqual(
             [
                 "Detecting table...",

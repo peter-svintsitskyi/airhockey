@@ -27,19 +27,19 @@ class CalibrateHandler(object):
     def __call__(self):
         t1 = time.time()
         i = 0
-        self.logger.info("Detecting table...")
         while True:
             with self.vision_query_context as context:
                 result = context.query(VerifyPositionQuery(self.color_range, self.expected_markers))
 
                 t2 = time.time()
-                if t2 - t1 < 1:
+                if t2 - t1 < self.delay:
                     continue
                 t1 = time.time()
                 i += 1
-                if i >= self.tries - 1:
+                if i > self.tries:
                     break
 
+                self.logger.info("Detecting table...")
                 if result == VerifyPositionQuery.SUCCESS:
                     self.logger.info("Table markers detected.")
                     return self.SUCCESS
