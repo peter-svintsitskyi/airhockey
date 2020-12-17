@@ -1,23 +1,22 @@
 import logging
-import time
 from airhockey.vision.query import QueryContext, VerifyPositionQuery
 from airhockey.vision.color import ColorRange
+from airhockey.utils import Timeout
 
 
-class CalibrateHandler(object):
+class DetectTableHandler(object):
     FAIL = "FAIL"
     SUCCESS = "SUCCESS"
 
     def __init__(self, *,
                  expected_markers: list,
-                 log: str,
                  color_range: ColorRange,
                  vision_query_context: QueryContext,
                  tries: int,
                  delay: int
                  ):
         self.expected_markers = expected_markers
-        self.logger = logging.getLogger(log)
+        self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)
         self.color_range = color_range
         self.vision_query_context = vision_query_context
@@ -25,16 +24,15 @@ class CalibrateHandler(object):
         self.delay = delay
 
     def __call__(self):
-        t1 = time.time()
         i = 0
+        t = Timeout(self.delay)
         while True:
             with self.vision_query_context as context:
                 result = context.query(VerifyPositionQuery(self.color_range, self.expected_markers))
 
-                t2 = time.time()
-                if t2 - t1 < self.delay:
+                if not t.timeout():
                     continue
-                t1 = time.time()
+
                 i += 1
                 if i > self.tries:
                     break

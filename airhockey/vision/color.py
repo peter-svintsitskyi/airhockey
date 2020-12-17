@@ -19,6 +19,14 @@ class ColorRange(object):
     def set_sv_low(self, v):
         self.sv_low = v
 
+    def __eq__(self, other):
+        return self.h_low == other.h_low and self.h_high == other.h_high and self.sv_low == other.sv_low
+
+    def __repr__(self):
+        return "ColorRange(H=({h_low},{h_high};SV_LOW={sv_low})".format(h_low=self.h_low,
+                                                                        h_high=self.h_high,
+                                                                        sv_low=self.sv_low)
+
 
 class ColorDetector(object):
     def __init__(self, *, color_range: ColorRange, translator):

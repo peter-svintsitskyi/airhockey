@@ -1,6 +1,5 @@
 import cv2
 import abc
-import numpy as np
 from airhockey.debug import DebugWindow
 from typing import Optional
 from airhockey.vision.color import ColorRange, ColorDetector
@@ -16,6 +15,26 @@ class Query(object):
     def draw(self, frame): raise NotImplementedError
 
 
+class VerifyPresenceQuery(Query):
+    NOT_PRESENT = "NOT_PRESENT"
+    PRESENT = "PRESENT"
+
+    def __init__(self, color_range):
+        self.color_range = color_range
+
+    def execute(self, hsv, translator, debug_window):
+        pass
+
+    def draw(self, frame):
+        pass
+
+    def __eq__(self, other):
+        return self.color_range == other.color_range
+
+    def __repr__(self):
+        return "{n}(color_range={r})".format(n=__class__, r=self.color_range)
+
+
 class VerifyPositionQuery(Query):
     NOT_DETECTED = "NO_SUCH_COLOR"
     OUT_OF_POSITION = "OUT_OF_POSITION"
@@ -29,9 +48,9 @@ class VerifyPositionQuery(Query):
     def __eq__(self, other):
         return self.color == other.color and self.positions == other.positions
 
-    def execute(self, frame_hsv, translator, debug_window):
+    def execute(self, hsv, translator, debug_window):
         detector = ColorDetector(color_range=self.color, translator=translator)
-        self.detected_positions = detector.get_positions(frame_hsv, len(self.positions), debug_window.frame)
+        self.detected_positions = detector.get_positions(hsv, len(self.positions), debug_window.frame)
 
         if len(self.detected_positions) != len(self.positions):
             return self.NOT_DETECTED

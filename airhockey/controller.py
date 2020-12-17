@@ -7,26 +7,6 @@ class RunHandlerException(Exception):
     pass
 
 
-class ControllerState(object):
-    def switch(self, state):
-        self.__class__ = state
-
-    def run(self):
-        pass
-
-
-class IdleControllerState(ControllerState):
-    pass
-
-
-class CalibrateControllerState(ControllerState):
-    pass
-
-
-class DetectRobotControllerState(ControllerState):
-    pass
-
-
 class HandlerWrapper(object):
     def __init__(self, handler, next_states):
         if next_states is None:
@@ -39,32 +19,36 @@ class HandlerWrapper(object):
 
 
 class Controller(object):
-    def __init__(self):
-        self._state = IdleControllerState()
+    def __init__(self, initial_state, terminal_state):
+        self._state = initial_state
+        self._terminal_state = terminal_state
         self._handlers = {}
 
     def get_state(self):
         return self._state
 
-    def start(self):
-        if self._state.__class__ != IdleControllerState:
-            raise IllegalStateSwitchException()
+    def register_handler(self, state, handler, next_states=None):
+        if state not in self._handlers:
+            self._handlers[state] = []
 
-        self._state.switch(CalibrateControllerState)
-
-    def register_handler(self, cls, handler, next_states=None):
-        if cls not in self._handlers:
-            self._handlers[cls] = []
-
-        self._handlers[cls].append(HandlerWrapper(handler, next_states))
+        self._handlers[state].append(HandlerWrapper(handler, next_states))
 
     def run(self):
-        state = None
-        for handler in self._handlers.get(self._state.__class__):
-            new_state = handler()
-            if state is not None and new_state is not None:
-                raise RunHandlerException("Trying to change the state of controller by multiple handlers")
-            state = new_state
+        while True:
+            next_state = None
+            handlers = self._handlers.get(self._state)
+            if handlers is None:
+                raise Exception("No handlers registered for the '{state}' state".format(state=self._state))
+            for handler in handlers:
+                returned_state = handler()
+                if next_state is not None and returned_state is not None:
+                    raise RunHandlerException("Trying to change the state of controller by multiple handlers")
+                next_state = returned_state
 
-        if state is not None:
-            self._state.switch(state)
+            if self._state == self._terminal_state:
+                break
+
+            if next_state is not None:
+                self._state = next_state
+
+
