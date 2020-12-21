@@ -1,11 +1,29 @@
+import logging
+
 import cv2
 import numpy as np
 from airhockey.vision.color import ColorRange
 from airhockey.geometry import PointF
 
 
+class DebugWindowLogHandler(logging.Handler):
+    def __init__(self):
+        super().__init__()
+        self.messages = []
+
+    def handle(self, record: logging.LogRecord) -> None:
+        self.messages.append(record.msg)
+
+    def draw(self, frame):
+        if len(self.messages) > 5:
+            self.messages.pop(0)
+        for i, m in enumerate(self.messages):
+            cv2.putText(frame, m, (10, i * 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), thickness=3)
+
+
+
 class DebugWindow(object):
-    def __init__(self, *, name, translator, table_size, color_ranges: list['ColorRange']):
+    def __init__(self, *, name, log, translator, table_size, color_ranges: list['ColorRange']):
         self.name = name
         self.translator = translator
         self.table_size = table_size
@@ -14,6 +32,11 @@ class DebugWindow(object):
         cv2.resizeWindow(self.name, 600, 600)
         self.frame = None
         self.hsv = None
+
+        self.log_handler = DebugWindowLogHandler()
+        self.log_handler.setLevel(logging.INFO)
+        logger = logging.getLogger(log)
+        logger.addHandler(self.log_handler)
 
         for r in color_ranges:
             cv2.createTrackbar('{name} H Low'.format(name=r.name), self.name, 0, 179, lambda x: r.set_h_low(x))
@@ -31,6 +54,7 @@ class DebugWindow(object):
         for query in queries:
             query.draw(self)
         cv2.rectangle(self.frame, self.translator.w2f(PointF(0, 0)).tuple(), self.translator.w2f(PointF(self.table_size)).tuple(), (0, 255, 255), 2)
+        self.log_handler.draw(self.frame)
         cv2.imshow(self.name, self.frame)
 
         # for r in self.color_ranges:
@@ -38,7 +62,6 @@ class DebugWindow(object):
         #     upper_color = np.array([r.h_high, 255, 255])
         #     mask = cv2.inRange(self.hsv, lower_color, upper_color)
         #     cv2.imshow(r.name, mask)
-
         cv2.waitKey(1)
 
     def draw_circle(self, world_coordinates, color):

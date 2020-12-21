@@ -5,7 +5,7 @@ import airhockey
 from airhockey.handlers.detect_players import DetectPlayersHandler
 from airhockey.vision.color import ColorRange
 from airhockey.vision.query import Query, VerifyPresenceQuery
-from airhockey_tests.helpers import SpyLogHandler, init_spy_log_handler
+from airhockey_tests.helpers import init_spy_log_handler
 
 
 class SpyQueryContext(object):
@@ -45,19 +45,23 @@ class TestDetectPlayersHandler(TestCase):
             vision_query_context=self.query_context,
             puck_color_range=self.puck_color_range,
             robot_pusher_color_range=self.robot_pusher_color_range,
-            tries=self.handler_tries_count)
+            tries=self.handler_tries_count,
+            delay=0)
 
     def test_fails_when_puck_was_not_detected(self):
         self.query_context.mock_query_results([
             VerifyPresenceQuery.NOT_PRESENT,
             VerifyPresenceQuery.NOT_PRESENT,
             VerifyPresenceQuery.NOT_PRESENT,
+            VerifyPresenceQuery.NOT_PRESENT,
+            VerifyPresenceQuery.NOT_PRESENT,
+            VerifyPresenceQuery.NOT_PRESENT,
         ])
         handler_result = self.handler()
         self.assertEqual(DetectPlayersHandler.FAIL, handler_result)
-        self.assertEqual(3, self.query_context.call_count)
-        expected_query = VerifyPresenceQuery(self.puck_color_range)
-        self.assertEqual([expected_query] * self.handler_tries_count, self.query_context.executed_queries)
+        self.assertEqual(6, self.query_context.call_count)
+        self.assertEqual(VerifyPresenceQuery(self.puck_color_range), self.query_context.executed_queries[0])
+        self.assertEqual(VerifyPresenceQuery(self.robot_pusher_color_range), self.query_context.executed_queries[1])
         self.assertEqual([
             "Detecting a puck and a robot pusher...",
             "Puck not found.",
@@ -66,11 +70,11 @@ class TestDetectPlayersHandler(TestCase):
             "Detecting a puck and a robot pusher...",
             "Puck not found."
         ], self.log_spy.messages)
-        self.assertGreater(self.query_context.context_enter_count, self.handler_tries_count)
 
     def test_fails_when_robot_pusher_was_not_detected(self):
         self.query_context.mock_query_results([
             VerifyPresenceQuery.NOT_PRESENT,  # puck
+            VerifyPresenceQuery.NOT_PRESENT,  # robot pusher
             VerifyPresenceQuery.PRESENT,      # puck
             VerifyPresenceQuery.NOT_PRESENT,  # robot pusher
             VerifyPresenceQuery.PRESENT,      # puck
@@ -78,34 +82,28 @@ class TestDetectPlayersHandler(TestCase):
         ])
         handler_result = self.handler()
         self.assertEqual(DetectPlayersHandler.FAIL, handler_result)
-        self.assertEqual(5, self.query_context.call_count)
-        expected_puck_query = VerifyPresenceQuery(self.puck_color_range)
-        self.assertEqual([expected_puck_query] * 2, self.query_context.executed_queries[:2])
-        expected_robot_pusher_query = VerifyPresenceQuery(self.robot_pusher_color_range)
-        self.assertEqual(expected_robot_pusher_query, self.query_context.executed_queries[2])
-        self.assertEqual(expected_puck_query, self.query_context.executed_queries[3])
-        self.assertEqual(expected_robot_pusher_query, self.query_context.executed_queries[4])
+        self.assertEqual(6, self.query_context.call_count)
+        self.assertEqual(VerifyPresenceQuery(self.puck_color_range), self.query_context.executed_queries[0])
+        self.assertEqual(VerifyPresenceQuery(self.robot_pusher_color_range), self.query_context.executed_queries[1])
         self.assertEqual([
             "Detecting a puck and a robot pusher...",
             "Puck not found.",
-
             "Detecting a puck and a robot pusher...",
             "Puck OK.",
             "Robot pusher not found.",
-
             "Detecting a puck and a robot pusher...",
             "Puck OK.",
             "Robot pusher not found."
         ], self.log_spy.messages)
-        self.assertGreater(self.query_context.context_enter_count, self.handler_tries_count)
 
     def test_success_when_both_puck_and_robot_pusher_detected(self):
         self.query_context.mock_query_results([
             VerifyPresenceQuery.NOT_PRESENT,  # puck
-            VerifyPresenceQuery.PRESENT,  # puck
             VerifyPresenceQuery.NOT_PRESENT,  # robot pusher
-            VerifyPresenceQuery.PRESENT,  # puck
-            VerifyPresenceQuery.PRESENT,  # robot pusher
+            VerifyPresenceQuery.PRESENT,      # puck
+            VerifyPresenceQuery.NOT_PRESENT,  # robot pusher
+            VerifyPresenceQuery.PRESENT,      # puck
+            VerifyPresenceQuery.PRESENT,      # robot pusher
         ])
         handler_result = self.handler()
         self.assertEqual(DetectPlayersHandler.SUCCESS, handler_result)
