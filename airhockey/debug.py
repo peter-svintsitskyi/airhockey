@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 from airhockey.vision.color import ColorRange
 from airhockey.geometry import PointF
+import textwrap
 
 
 class DebugWindowLogHandler(logging.Handler):
@@ -11,15 +12,18 @@ class DebugWindowLogHandler(logging.Handler):
         super().__init__()
         self.messages = []
 
-    def handle(self, record: logging.LogRecord) -> None:
-        self.messages.append(record.msg)
+    def emit(self, record):
+        msg = self.format(record)
+        self.messages.append(msg)
 
-    def draw(self, frame):
-        if len(self.messages) > 5:
+    def draw(self, frame, y_start):
+        if len(self.messages) > 3:
             self.messages.pop(0)
-        for i, m in enumerate(self.messages):
-            cv2.putText(frame, m, (10, i * 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), thickness=3)
-
+        line_num = 0
+        for m in self.messages:
+            for index, line in enumerate(textwrap.wrap(m, 90)):
+                cv2.putText(frame, line, (10, y_start + line_num * 50 - index * 20 + 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (150, 255, 150), thickness=2)
+                line_num += 1
 
 
 class DebugWindow(object):
@@ -29,11 +33,13 @@ class DebugWindow(object):
         self.table_size = table_size
         self.color_ranges = color_ranges
         cv2.namedWindow(self.name, cv2.WINDOW_NORMAL)
-        cv2.resizeWindow(self.name, 600, 600)
+        cv2.resizeWindow(self.name, 1000, 1000)
         self.frame = None
         self.hsv = None
 
         self.log_handler = DebugWindowLogHandler()
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        self.log_handler.setFormatter(formatter)
         self.log_handler.setLevel(logging.INFO)
         logger = logging.getLogger(log)
         logger.addHandler(self.log_handler)
@@ -54,8 +60,11 @@ class DebugWindow(object):
         for query in queries:
             query.draw(self)
         cv2.rectangle(self.frame, self.translator.w2f(PointF(0, 0)).tuple(), self.translator.w2f(PointF(self.table_size)).tuple(), (0, 255, 255), 2)
-        self.log_handler.draw(self.frame)
-        cv2.imshow(self.name, self.frame)
+        h, w, d = self.frame.shape
+        target = np.zeros((h + 300, w + 300, d), np.uint8)
+        target[0:h, 0:w] = self.frame
+        self.log_handler.draw(target, h)
+        cv2.imshow(self.name, target)
 
         # for r in self.color_ranges:
         #     lower_color = np.array([r.h_low, r.sv_low, r.sv_low])
