@@ -1,4 +1,3 @@
-
 class IllegalStateSwitchException(Exception):
     pass
 
@@ -38,11 +37,15 @@ class Controller(object):
             next_state = None
             handlers = self._handlers.get(self._state)
             if handlers is None:
-                raise Exception("No handlers registered for the '{state}' state".format(state=self._state))
+                raise Exception(
+                    "No handlers registered for the '{state}' state".format(
+                        state=self._state))
             for handler in handlers:
                 returned_state = handler()
                 if next_state is not None and returned_state is not None:
-                    raise RunHandlerException("Trying to change the state of controller by multiple handlers")
+                    raise RunHandlerException(
+                        "Trying to change the state of controller by multiple "
+                        "handlers")
                 next_state = returned_state
 
             if self._state == self._terminal_state:
@@ -50,5 +53,3 @@ class Controller(object):
 
             if next_state is not None:
                 self._state = next_state
-
-

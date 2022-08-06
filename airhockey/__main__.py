@@ -1,24 +1,30 @@
 import logging
-import time
-from airhockey.controller import *
+
+from airhockey.controller import Controller
 from airhockey.handlers.await_video import AwaitVideoHandler
+from airhockey.handlers.check_network import CheckNetworkHandler
 from airhockey.handlers.detect_players import DetectPlayersHandler
 from airhockey.handlers.detect_table import DetectTableHandler
 from airhockey.handlers.failed import FailedHandler
+from airhockey.handlers.test_moves import TestMovesHandler
+from airhockey.robot import Robot
 from airhockey.vision.video import ScreenCapture
 from airhockey.vision.color import ColorRange
 from airhockey.vision.query import QueryContext
 from airhockey.translate import WorldToFrameTranslator
 from airhockey.debug import DebugWindow
-from airhockey.geometry import PointF
 
 logger = logging.getLogger("airhockey")
 logger.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter(
+    '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 console = logging.StreamHandler()
 console.setFormatter(formatter)
 logger.addHandler(console)
 logger.info("Welcome")
+
+robot_host = 'localhost'
+robot_port = 1133
 
 table_size = (1200, 600)
 frame_size = (1280, 768)
@@ -41,12 +47,13 @@ robot_pusher_color_range = ColorRange(name="Robot Pusher",
                                       h_high=30,
                                       sv_low=53)
 
-
 debug_window = DebugWindow(name="game",
                            log="airhockey",
                            translator=translator,
                            table_size=table_size,
-                           color_ranges=[table_markers_color_range, puck_color_range, robot_pusher_color_range])
+                           color_ranges=[table_markers_color_range,
+                                         puck_color_range,
+                                         robot_pusher_color_range])
 
 vision_query_context = QueryContext(translator=translator,
                                     frame_reader=video_stream,
@@ -54,21 +61,45 @@ vision_query_context = QueryContext(translator=translator,
 
 await_video_handler = AwaitVideoHandler(video_stream=video_stream, timeout=10)
 
-detect_table_handler = DetectTableHandler(expected_markers=[PointF(400, 0), PointF(400, 600)],
-                                          color_range=table_markers_color_range,
-                                          vision_query_context=vision_query_context,
-                                          tries=500,
-                                          delay=1
-                                          )
+detect_table_handler = DetectTableHandler(
+    expected_markers=[(400, 0), (400, 600)],
+    color_range=table_markers_color_range,
+    vision_query_context=vision_query_context,
+    tries=500,
+    delay=1
+    )
 
-detect_players_handler = DetectPlayersHandler(vision_query_context=vision_query_context,
-                                              puck_color_range=puck_color_range,
-                                              robot_pusher_color_range=robot_pusher_color_range,
-                                              tries=500,
-                                              delay=1)
+detect_players_handler = DetectPlayersHandler(
+    vision_query_context=vision_query_context,
+    puck_color_range=puck_color_range,
+    robot_pusher_color_range=robot_pusher_color_range,
+    tries=500,
+    delay=1)
+
+check_network_handler = CheckNetworkHandler(
+    host=robot_host,
+    port=robot_port,
+    tries=500,
+    delay=5
+)
+
+test_moves_handler = TestMovesHandler(
+    destinations=[
+        (300, 300),
+        (50, 50),
+        (550, 50),
+        (550, 550),
+        (50, 550),
+        (50, 50),
+        (300, 300),
+    ],
+    robot=Robot(host=robot_host, port=robot_port),
+    vision_query_context=vision_query_context,
+    robot_pusher_color_range=robot_pusher_color_range,
+    delay=2
+)
 
 failed_handler = FailedHandler()
-
 
 FAILED_STATE = "FAILED_STATE"
 AWAIT_VIDEO = "AWAIT_VIDEO"
@@ -91,7 +122,15 @@ state_transitions = {
     DETECT_PLAYERS: (detect_players_handler, {
         detect_players_handler.SUCCESS: CHECK_NETWORK,
         detect_players_handler.FAIL: FAILED_STATE,
-    })
+    }),
+    CHECK_NETWORK: (check_network_handler, {
+        check_network_handler.SUCCESS: TEST_MOVES,
+        check_network_handler.FAIL: FAILED_STATE
+    }),
+    TEST_MOVES: (test_moves_handler, {
+        check_network_handler.SUCCESS: PLAY_GAME,
+        check_network_handler.FAIL: FAILED_STATE
+    }),
 }
 
 controller = Controller(AWAIT_VIDEO, FAILED_STATE)

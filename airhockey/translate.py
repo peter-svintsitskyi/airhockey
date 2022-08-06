@@ -1,4 +1,4 @@
-from airhockey.geometry import Point, PointF
+from typing import Tuple
 
 
 class WorldToFrameTranslator(object):
@@ -12,12 +12,12 @@ class WorldToFrameTranslator(object):
         self.horizontal_ratio = self.table_width / frame_field_width
         self.vertical_ratio = self.table_height / frame_field_height
 
-    def w2f(self, w: PointF):
-        f_x = int(w.x / self.horizontal_ratio + self.horizontal_margin)
-        f_y = int(w.y / self.vertical_ratio + self.vertical_margin)
-        return Point(f_x, f_y)
+    def w2f(self, w: Tuple[float, float]) -> Tuple[int, int]:
+        f_x = int(w[0] / self.horizontal_ratio + self.horizontal_margin)
+        f_y = int(w[1] / self.vertical_ratio + self.vertical_margin)
+        return f_x, f_y
 
-    def f2w(self, f: Point):
-        w_x = (f.x - self.horizontal_margin) * self.horizontal_ratio
-        w_y = (f.y - self.vertical_margin) * self.vertical_ratio
-        return PointF(w_x, w_y)
+    def f2w(self, f: Tuple) -> Tuple[float, float]:
+        w_x = (f[0] - self.horizontal_margin) * self.horizontal_ratio
+        w_y = (f[1] - self.vertical_margin) * self.vertical_ratio
+        return w_x, w_y

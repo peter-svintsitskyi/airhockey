@@ -12,10 +12,11 @@ class TestWorld(unittest.TestCase):
 
     def test_intersect_puck_trajectory_at_x_1(self):
         """
-            Puck moves in parallel to the table edges towards the robot 
+            Puck moves in parallel to the table edges towards the robot
         """
         w = World(table_size=(1200, 600))
-        w.puck_info = PuckInfo(position=(600, 300), vector=(-1, 0), velocity=100)
+        w.puck_info = PuckInfo(position=(600, 300), vector=(-1, 0),
+                               velocity=100)
 
         intersection = w.intersect_puck_trajectory_at_x(0)
         self.assert_intersection(((0.0, 300.0), 6.0), intersection)
@@ -25,22 +26,25 @@ class TestWorld(unittest.TestCase):
 
     def test_intersect_puck_trajectory_at_x_2(self):
         """
-            Puck moves at 45 degrees 
+            Puck moves at 45 degrees
         """
         w = World(table_size=(1200, 600))
 
-        w.puck_info = PuckInfo(position=(600, 300), vector=(-1, -1), velocity=100)
+        w.puck_info = PuckInfo(position=(600, 300), vector=(-1, -1),
+                               velocity=100)
         intersection = w.intersect_puck_trajectory_at_x(0)
         self.assert_intersection(((0.0, 300.0), 8.485), intersection)
 
-        w.puck_info = PuckInfo(position=(600, 300), vector=(-1, 1), velocity=100)
+        w.puck_info = PuckInfo(position=(600, 300), vector=(-1, 1),
+                               velocity=100)
         intersection = w.intersect_puck_trajectory_at_x(0)
         self.assert_intersection(((0.0, 300.0), 8.485), intersection)
 
     def test_multiple_edge_hits(self):
         w = World(table_size=(1200, 600))
 
-        w.puck_info = PuckInfo(position=(600, 300), vector=(-1.5, -3), velocity=100)
+        w.puck_info = PuckInfo(position=(600, 300), vector=(-1.5, -3),
+                               velocity=100)
 
         intersection = w.intersect_puck_trajectory_at_x(0)
         self.assert_intersection(((0.0, 300.0), 13.416), intersection)

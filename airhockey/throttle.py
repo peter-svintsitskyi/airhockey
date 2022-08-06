@@ -1,3 +1,6 @@
+import time
+
+
 class FrameThrottler(object):
     def __init__(self, desired_fps):
         self.desired_fps = desired_fps
@@ -19,4 +22,3 @@ class FrameThrottler(object):
         self.last_frame_time = time.time()
 
         self.fps = self.number_of_frames / (self.last_frame_time - self.start)
-

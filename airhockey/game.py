@@ -1,21 +1,19 @@
 import cv2
 import numpy as np
-from sklearn import preprocessing
 import math
 import time
-import json
-from random import randint
-from threading import Thread, Lock
-from airhockey.vision.video import VideoStream, ScreenCapture
+from airhockey.vision.video import ScreenCapture
 from airhockey.vision.color import ColorDetector
 from airhockey.robot import Robot
 from airhockey.debug import Debug
 from airhockey.tracker import Tracker
 from airhockey.translate import WorldToFrameTranslator
 
+
 def get_intersect(a1, a2, b1, b2):
-    """ 
-    Returns the point of intersection of the lines passing through a2,a1 and b2,b1.
+    """
+    Returns the point of intersection of the lines passing through a2,a1 and
+    b2,b1.
     a1: [x, y] a point on the first line
     a2: [x, y] another point on the first line
     b1: [x, y] a point on the second line
@@ -44,10 +42,9 @@ class GameStrategy(object):
     def __init__(self, world, robot):
         self.world = world
         self.robot = robot
-        
+
         self.old_x = None
         self.old_y = None
-
 
     def tick(self, *, robot_position):
         if robot_position is None:
@@ -60,7 +57,7 @@ class GameStrategy(object):
 
         if self.world.puck_info is None:
             return
-        puck_x, puck_y = world.puck_info.position
+        puck_x, puck_y = self.world.puck_info.position
 
         dx = puck_x - robot_x
         dy = puck_y - robot_y
@@ -72,14 +69,14 @@ class GameStrategy(object):
             self.move = True
 
         if len(self.world.trajectory) == 0:
-           return
+            return
 
         index = 0
-#         if len(self.world.trajectory) == 1:
-#             index = 0
+        #         if len(self.world.trajectory) == 1:
+        #             index = 0
 
         # index = randint(0, len(self.world.trajectory) - 1)
-        
+
         point, eta = self.world.trajectory[index]
         nx, ny = point
 
@@ -155,26 +152,34 @@ def run():
     PUCK_H_HIGH = 78
     # PUCK_SV_LOW = 50
     PUCK_SV_LOW = 102
-    puck_detector = ColorDetector(h_low=PUCK_H_LOW, h_high=PUCK_H_HIGH, sv_low=PUCK_SV_LOW)
+    puck_detector = ColorDetector(h_low=PUCK_H_LOW, h_high=PUCK_H_HIGH,
+                                  sv_low=PUCK_SV_LOW)
 
     ROBOT_H_LOW = 20
     ROBOT_H_HIGH = 30
     ROBOT_SV_LOW = 125
-    robot_detector = ColorDetector(h_low=ROBOT_H_LOW, h_high=ROBOT_H_HIGH, sv_low=ROBOT_SV_LOW)
+    robot_detector = ColorDetector(h_low=ROBOT_H_LOW, h_high=ROBOT_H_HIGH,
+                                   sv_low=ROBOT_SV_LOW)
 
     cv2.namedWindow('frame', cv2.WINDOW_NORMAL)
-    cv2.createTrackbar('Puck H Low', 'frame', 0, 255, lambda x: puck_detector.set_h_low(x))
+    cv2.createTrackbar('Puck H Low', 'frame', 0, 255,
+                       lambda x: puck_detector.set_h_low(x))
     cv2.setTrackbarPos('Puck H Low', 'frame', PUCK_H_LOW)
-    cv2.createTrackbar('Puck H High', 'frame', 0, 255, lambda x: puck_detector.set_h_high(x))
+    cv2.createTrackbar('Puck H High', 'frame', 0, 255,
+                       lambda x: puck_detector.set_h_high(x))
     cv2.setTrackbarPos('Puck H High', 'frame', PUCK_H_HIGH)
-    cv2.createTrackbar('Puck SV Low', 'frame', 0, 255, lambda x: puck_detector.set_sv_low(x))
+    cv2.createTrackbar('Puck SV Low', 'frame', 0, 255,
+                       lambda x: puck_detector.set_sv_low(x))
     cv2.setTrackbarPos('Puck SV Low', 'frame', PUCK_SV_LOW)
 
-    cv2.createTrackbar('Robot H Low', 'frame', 0, 255, lambda x: robot_detector.set_h_low(x))
+    cv2.createTrackbar('Robot H Low', 'frame', 0, 255,
+                       lambda x: robot_detector.set_h_low(x))
     cv2.setTrackbarPos('Robot H Low', 'frame', ROBOT_H_LOW)
-    cv2.createTrackbar('Robot H High', 'frame', 0, 255, lambda x: robot_detector.set_h_high(x))
+    cv2.createTrackbar('Robot H High', 'frame', 0, 255,
+                       lambda x: robot_detector.set_h_high(x))
     cv2.setTrackbarPos('Robot H High', 'frame', ROBOT_H_HIGH)
-    cv2.createTrackbar('Robot SV Low', 'frame', 0, 255, lambda x: robot_detector.set_sv_low(x))
+    cv2.createTrackbar('Robot SV Low', 'frame', 0, 255,
+                       lambda x: robot_detector.set_sv_low(x))
     cv2.setTrackbarPos('Robot SV Low', 'frame', ROBOT_SV_LOW)
 
     table_size = (1200, 600)
@@ -201,39 +206,38 @@ def run():
         while video_stream.has_frame():
             # frame_throttler.throttle()
             frame = video_stream.read()
-            
-            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)            
-            
+
+            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
             puck_position = puck_detector.get_position(hsv)
 
             if puck_position is not None:
-               puck_position = translator.f2w(puck_position)
-               track = tracker.direction(*puck_position)
-               if track is not None:
-                   vector, velocity = track
-                   world.tick(PuckInfo(puck_position, vector, velocity))
+                puck_position = translator.f2w(puck_position)
+                track = tracker.direction(*puck_position)
+                if track is not None:
+                    vector, velocity = track
+                    world.tick(PuckInfo(puck_position, vector, velocity))
 
             else:
                 pass
                 # print('Puck not found')
 
-
             robot_position = robot_detector.get_position(hsv)
             if robot_position is not None:
-               robot_position = translator.f2w(robot_position)
+                robot_position = translator.f2w(robot_position)
 
             debug.draw(frame=frame.copy(), world_debug=world.get_debug(),
-                      robot_position=robot_position,
-                      robot_dst=robot.destination,
-                      fps=0,
-                      video_stream=video_stream)
+                       robot_position=robot_position,
+                       robot_dst=robot.destination,
+                       fps=0,
+                       video_stream=video_stream)
 
             game_strategy.tick(robot_position=robot_position)
 
-            #if puck_detector.mask is not None:
+            # if puck_detector.mask is not None:
             #   cv2.imshow('puck mask', puck_detector.mask)
-            
-            #if robot_detector.mask is not None:
+
+            # if robot_detector.mask is not None:
             #   cv2.imshow('robot mask', robot_detector.mask)
 
             k = cv2.waitKey(5) & 0xFF

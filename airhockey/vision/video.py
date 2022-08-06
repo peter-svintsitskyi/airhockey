@@ -8,6 +8,7 @@ import abc
 
 class FrameReader(object):
     __metaclass__ = abc.ABCMeta
+
     @abc.abstractmethod
     def read(self): raise NotImplementedError
 
@@ -74,7 +75,8 @@ class VideoStream(FrameReader):
 class ScreenCapture(FrameReader):
     def __init__(self, frame_dimensions):
         width, height = frame_dimensions
-        self.bounding_box = {'top': 150, 'left': 100, 'width': width / 2, 'height': height / 2}
+        self.bounding_box = {'top': 150, 'left': 100, 'width': width / 2,
+                             'height': height / 2}
         self.sct = mss()
         self.stopped = False
         self.frame = None

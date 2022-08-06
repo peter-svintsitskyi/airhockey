@@ -8,7 +8,15 @@ class DetectPlayersHandler(object):
     FAIL = "FAIL"
     SUCCESS = "SUCCESS"
 
-    def __init__(self, *, vision_query_context, puck_color_range, robot_pusher_color_range, tries, delay):
+    def __init__(
+            self,
+            *,
+            vision_query_context,
+            puck_color_range,
+            robot_pusher_color_range,
+            tries,
+            delay
+    ):
         self.vision_query_context = vision_query_context
         self.puck_color_range = puck_color_range
         self.robot_pusher_color_range = robot_pusher_color_range
@@ -22,8 +30,10 @@ class DetectPlayersHandler(object):
         i = 0
         while True:
             with self.vision_query_context:
-                puck = self.vision_query_context.query(VerifyPresenceQuery(self.puck_color_range))
-                robot_pusher = self.vision_query_context.query(VerifyPresenceQuery(self.robot_pusher_color_range))
+                puck = self.vision_query_context.query(
+                    VerifyPresenceQuery(self.puck_color_range))
+                robot_pusher = self.vision_query_context.query(
+                    VerifyPresenceQuery(self.robot_pusher_color_range))
 
                 if not t.timeout():
                     continue
@@ -45,5 +55,3 @@ class DetectPlayersHandler(object):
                     break
 
         return self.FAIL
-
-

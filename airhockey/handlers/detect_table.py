@@ -28,7 +28,9 @@ class DetectTableHandler(object):
         t = Timeout(self.delay)
         while True:
             with self.vision_query_context as context:
-                result = context.query(VerifyPositionQuery(self.color_range, self.expected_markers))
+                result = context.query(VerifyPositionQuery(
+                    self.color_range,
+                    self.expected_markers))
 
                 if not t.timeout():
                     continue
@@ -46,7 +48,8 @@ class DetectTableHandler(object):
                 elif result == VerifyPositionQuery.NOT_DETECTED:
                     self.logger.info("Could not see table markers.")
                 else:
-                    raise RuntimeError("Query result {result} is not supported".format(result=result))
+                    raise RuntimeError(
+                        "Query result {result} is not supported".format(
+                            result=result))
 
         return self.FAIL
-

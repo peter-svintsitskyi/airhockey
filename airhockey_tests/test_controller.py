@@ -1,5 +1,6 @@
 import unittest
-from airhockey.controller import *
+
+from airhockey.controller import Controller, RunHandlerException
 
 
 def foo_handler():
@@ -42,5 +43,5 @@ class TestStateHandler(unittest.TestCase):
         c = Controller("state", "state")
         c.register_handler("state", foo_handler, {"foo": "FakeState"})
         c.register_handler("state", foo_handler, {"foo": "FakeState"})
-        with self.assertRaises(RunHandlerException) as context:
+        with self.assertRaises(RunHandlerException):
             c.run()

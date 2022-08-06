@@ -14,5 +14,8 @@
     "planck-js": "^0.3.22",
     "stage-js": "^0.9.3",
     "viewer": "^0.10.11"
+  },
+  "devDependencies": {
+    "parcel": "^2.7.0"
   }
 }

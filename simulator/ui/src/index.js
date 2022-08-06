@@ -133,8 +133,15 @@ Application((app) => {
   }, aiPusherGround, aiPusher, aiPusher.getPosition());
   world.createJoint(aiPusherJoint);
 
-  var connection = new WebSocket('ws://localhost:8080');
+  var connection = new WebSocket('ws://localhost:1122');
   connection.onmessage = function (e) {
+    console.log(e);
+    if (e.data == 'ping') {
+      console.log('received ping message')
+      connection.send('pong airhockey');
+      return;
+    }
+
     aiPusherJoint.setTarget(JSON.parse(e.data));
   };
 

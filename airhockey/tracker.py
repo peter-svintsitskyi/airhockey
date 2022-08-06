@@ -1,3 +1,9 @@
+import math
+
+import numpy as np
+from sklearn import preprocessing
+
+
 class Tracker(object):
     x = None
     y = None
@@ -27,5 +33,3 @@ class Tracker(object):
             return None
 
         return self.old_vector, math.sqrt(velocity_square)
-
-
