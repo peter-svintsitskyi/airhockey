@@ -1,0 +1,81 @@
+{
+  "name": "simulator",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron-forge start",
+    "dev": "electron-webpack dev",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "package": "electron-forge package",
+    "make": "electron-forge make"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/peter-svintsitskyi/airhockey.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/peter-svintsitskyi/airhockey/issues"
+  },
+  "homepage": "https://github.com/peter-svintsitskyi/airhockey#readme",
+  "devDependencies": {
+    "@electron-forge/cli": "^6.0.0-beta.65",
+    "@electron-forge/maker-deb": "^6.0.0-beta.65",
+    "@electron-forge/maker-rpm": "^6.0.0-beta.65",
+    "@electron-forge/maker-squirrel": "^6.0.0-beta.65",
+    "@electron-forge/maker-zip": "^6.0.0-beta.65",
+    "electron": "^20.0.2"
+  },
+  "dependencies": {
+    "application": "^0.1.4",
+    "electron-squirrel-startup": "^1.0.0",
+    "electron-webpack": "^2.8.2",
+    "planck-js": "^0.3.22",
+    "stage-js": "^0.9.3",
+    "viewer": "^0.10.11",
+    "webpack": "^4.46.0"
+  },
+  "config": {
+    "forge": {
+      "packagerConfig": {},
+      "makers": [
+        {
+          "name": "@electron-forge/maker-squirrel",
+          "config": {
+            "name": "simulator"
+          }
+        },
+        {
+          "name": "@electron-forge/maker-zip",
+          "platforms": [
+            "darwin"
+          ]
+        },
+        {
+          "name": "@electron-forge/maker-deb",
+          "config": {}
+        },
+        {
+          "name": "@electron-forge/maker-rpm",
+          "config": {}
+        }
+      ]
+    }
+  },
+  "electronWebpack": {
+    "title": "Airhockey simulator",
+    "commonSourceDirectory": "src/common",
+    "staticSourceDirectory": "src/static",
+    "main": {
+      "extraEntries": ["@/preload.js"],
+      "sourceDirectory": "src/main",
+      "webpackConfig": "webpack.main.additions.js"
+    },
+    "renderer": {
+      "sourceDirectory": "src/renderer",
+      "webpackConfig": "webpack.renderer.additions.js"
+    }
+  }
+}
