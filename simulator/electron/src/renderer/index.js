@@ -2,7 +2,6 @@ if (module.hot) {
     module.hot.accept();
 }
 
-var DEBUG = false
 const Application = require('./application')
 const planck = require('planck-js')
 

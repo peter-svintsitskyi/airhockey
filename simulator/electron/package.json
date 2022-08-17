@@ -2,12 +2,13 @@
   "name": "simulator",
   "version": "1.0.0",
   "description": "",
-  "main": "main.js",
+  "main": "dist/main/main.js",
   "scripts": {
     "start": "electron-forge start",
     "dev": "electron-webpack dev",
+    "build": "electron-webpack app",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "package": "electron-forge package",
+    "package": "electron-webpack app && electron-forge package",
     "make": "electron-forge make"
   },
   "repository": {

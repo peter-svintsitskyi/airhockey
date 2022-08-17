@@ -43,7 +43,7 @@ function createServer(sendCallback) {
         const x = -width / 2 + view[0] / 100;
         const y = height / 2 - view[1] / 100;
         console.log(`[${m++}] UDP server got: x:${x} y:${y} from ${rinfo.address}:${rinfo.port}`);
-        sendCallback.send('update-coords', JSON.stringify({ x, y }));
+        sendCallback('update-coords', JSON.stringify({ x, y }));
     });
 
     udp.bind(UDP_PORT);
@@ -51,8 +51,6 @@ function createServer(sendCallback) {
 }
 
 function createMainWindow() {
-    console.log(path.resolve(__dirname, '../../dist/main', 'preload.js'))
-    let preloadPath
     const window = new BrowserWindow({
         webPreferences: {
             preload: path.resolve(__dirname, '../../dist/main', 'preload.js'),
@@ -70,7 +68,7 @@ function createMainWindow() {
     }
     else {
         window.loadURL(formatUrl({
-            pathname: path.join(__dirname, 'index.html'),
+            pathname: path.resolve(__dirname, '../../dist/renderer', 'index.html'),
             protocol: 'file',
             slashes: true
         }))
@@ -87,8 +85,8 @@ function createMainWindow() {
         })
     })
 
-    // createServer(window.webContents.send.bind(window.webContents));
-    createServer(window.webContents);
+    createServer(window.webContents.send.bind(window.webContents));
+    // createServer(window.webContents);
 
     return window
 }
