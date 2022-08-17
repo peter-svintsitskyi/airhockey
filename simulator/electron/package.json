@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "application": "^0.1.4",
+    "dgram": "^1.0.1",
     "electron-squirrel-startup": "^1.0.0",
     "electron-webpack": "^2.8.2",
     "planck-js": "^0.3.22",
@@ -69,7 +70,9 @@
     "commonSourceDirectory": "src/common",
     "staticSourceDirectory": "src/static",
     "main": {
-      "extraEntries": ["@/preload.js"],
+      "extraEntries": [
+        "@/preload.js"
+      ],
       "sourceDirectory": "src/main",
       "webpackConfig": "webpack.main.additions.js"
     },

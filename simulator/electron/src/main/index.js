@@ -3,15 +3,59 @@
 import { app, BrowserWindow } from 'electron'
 import * as path from 'path'
 import { format as formatUrl } from 'url'
+import dgram from 'dgram'
 
 const isDevelopment = process.env.NODE_ENV !== 'production'
 
 // global reference to mainWindow (necessary to prevent window from being garbage collected)
 let mainWindow
 
+let m = 0
+const UDP_PORT = 1133
+
+function createServer(sendCallback) {
+    console.log('Starting UDP server on port ' + UDP_PORT);
+    const udp = dgram.createSocket('udp4');
+
+    udp.on('error', (err) => {
+        console.log(`UDP server error:\n${err.stack}`);
+        udp.close();
+    });
+
+    udp.on('message', (buffer, rinfo) => {
+        if (buffer.toString() == 'ping') {
+            console.log('Received ping message')
+            console.log(rinfo);
+
+            udp.send(e.data, rinfo.port, rinfo.address, (error) => {
+                if (error) {
+                    console.log(error);
+                } else {
+                    console.log('response sent to brains')
+                }
+            })
+            return;
+        }
+        console.log('Received message: ' + buffer.toString());
+
+        let view = new Int32Array(buffer.buffer);
+        const width = 12.0, height = 6.00;
+        const x = -width / 2 + view[0] / 100;
+        const y = height / 2 - view[1] / 100;
+        console.log(`[${m++}] UDP server got: x:${x} y:${y} from ${rinfo.address}:${rinfo.port}`);
+        sendCallback.send('update-coords', JSON.stringify({ x, y }));
+    });
+
+    udp.bind(UDP_PORT);
+
+}
+
 function createMainWindow() {
+    console.log(path.resolve(__dirname, '../../dist/main', 'preload.js'))
+    let preloadPath
     const window = new BrowserWindow({
         webPreferences: {
+            preload: path.resolve(__dirname, '../../dist/main', 'preload.js'),
             nodeIntegration: true,
             contextIsolation: false
         }
@@ -42,6 +86,9 @@ function createMainWindow() {
             window.focus()
         })
     })
+
+    // createServer(window.webContents.send.bind(window.webContents));
+    createServer(window.webContents);
 
     return window
 }

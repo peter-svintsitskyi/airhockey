@@ -6,9 +6,6 @@ var DEBUG = false
 const Application = require('./application')
 const planck = require('planck-js')
 
-
-
-
 Application((app) => {
     var pl = planck, Vec2 = pl.Vec2;
 
@@ -140,17 +137,22 @@ Application((app) => {
     }, aiPusherGround, aiPusher, aiPusher.getPosition());
     world.createJoint(aiPusherJoint);
 
-    var connection = new WebSocket('ws://localhost:1122');
-    connection.onmessage = function (e) {
-        console.log(e);
-        if (e.data == 'ping') {
-            console.log('received ping message')
-            connection.send('pong airhockey');
-            return;
-        }
+    // var connection = new WebSocket('ws://localhost:1122');
+    window.api.UdpCallback((event, value) => {
+        console.log('test')
+        console.log(value)
+        aiPusherJoint.setTarget(JSON.parse(value));
+    })
+    // connection.onmessage = function (e) {
+    //     console.log(e);
+    //     if (e.data == 'ping') {
+    //         console.log('received ping message')
+    //         connection.send('pong airhockey');
+    //         return;
+    //     }
 
-        aiPusherJoint.setTarget(JSON.parse(e.data));
-    };
+    //     aiPusherJoint.setTarget(JSON.parse(e.data));
+    // };
 
 
     world.on('post-solve', function (contact) {
