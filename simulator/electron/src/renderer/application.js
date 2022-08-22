@@ -14,10 +14,10 @@ function setupCanvas(){
     }
 
     canvas.width = 800;
-    canvas.height = 600;
+    canvas.height = 366;
     canvas.id = 'stage'; // create special canvas so Stagejs can pick it up
     canvas.style.width = '800px';
-    canvas.style.height = '600px';
+    canvas.style.height = '366px';
 }
 
 const Application = function (callback) {
