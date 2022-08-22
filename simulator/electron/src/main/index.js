@@ -27,7 +27,7 @@ function createServer(sendCallback) {
             console.log('Received ping message')
             console.log(rinfo);
 
-            udp.send(e.data, rinfo.port, rinfo.address, (error) => {
+            udp.send("pong", rinfo.port, rinfo.address, (error) => {
                 if (error) {
                     console.log(error);
                 } else {

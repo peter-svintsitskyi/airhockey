@@ -16,8 +16,8 @@ function setupCanvas(){
     canvas.width = 800;
     canvas.height = 600;
     canvas.id = 'stage'; // create special canvas so Stagejs can pick it up
-    canvas.style.width = '800';
-    canvas.style.height = '600';
+    canvas.style.width = '800px';
+    canvas.style.height = '600px';
 }
 
 const Application = function (callback) {
@@ -48,13 +48,13 @@ const Application = function (callback) {
         app.x = 0;
         app.y = -10;
         app.scaleY = -1;
-        app.ratio = 16;
+        app.ratio = 1;
         app.hz = 60;
         app.speed = 1;
         app.activeKeys = {};
         app.background = '#222222';
         
-        stage.viewport(app.width, app.height, 1); //if custom canvas used, set viewport size
+        stage.viewport(app.width, app.height, 16); //if custom canvas used, set viewport size
 
         var lastDrawHash = "", drawHash = "";
 
