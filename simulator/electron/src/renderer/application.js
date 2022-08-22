@@ -54,7 +54,7 @@ const Application = function (callback) {
         app.activeKeys = {};
         app.background = '#222222';
         
-        stage.viewport(app.width, app.height, 16); //if custom canvas used, set viewport size
+        stage.viewport(app.width, app.height, 1); //if custom canvas used, set viewport size
 
         var lastDrawHash = "", drawHash = "";
 
