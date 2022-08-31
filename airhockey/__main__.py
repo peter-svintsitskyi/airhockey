@@ -66,7 +66,8 @@ detect_table_handler = DetectTableHandler(
     color_range=table_markers_color_range,
     vision_query_context=vision_query_context,
     tries=500,
-    delay=1
+    delay=1,
+    success_retries=10
     )
 
 detect_players_handler = DetectPlayersHandler(

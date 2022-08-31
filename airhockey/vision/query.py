@@ -6,6 +6,8 @@ import numpy as np
 
 from airhockey.debug import DebugWindow
 from typing import Optional, Tuple, List
+
+from airhockey.translate import WorldToFrameTranslator
 from airhockey.vision.color import ColorRange, ColorDetector
 from airhockey.vision.video import FrameReader
 
@@ -41,25 +43,34 @@ class VerifyPresenceQuery(Query):
 
 
 class VerifyPositionQuery(Query):
-    NOT_DETECTED = "NO_SUCH_COLOR"
+    NOT_DETECTED = "NOT_DETECTED"
     OUT_OF_POSITION = "OUT_OF_POSITION"
     SUCCESS = "SUCCESS"
 
-    def __init__(self, color: ColorRange, positions: list):
+    def __init__(
+            self,
+            color: ColorRange,
+            expected_positions: List[Tuple[float, float]]
+    ) -> None:
         self.color = color
-        self.positions = positions
+        self.expected_positions = expected_positions
         self.detected_positions: List[Tuple[float, float]] = []
+        self.detector = ColorDetector(color_range=self.color)
 
     def __eq__(self, other):
-        return self.color == other.color and self.positions == other.positions
+        return self.color == other.color and \
+               self.expected_positions == other.expected_positions
 
-    def execute(self, hsv, translator, debug_window):
-        detector = ColorDetector(color_range=self.color, translator=translator)
-        self.detected_positions = detector.get_positions(hsv,
-                                                         len(self.positions),
-                                                         debug_window.frame)
+    def execute(self, hsv, translator: WorldToFrameTranslator, debug_window):
+        self.detected_positions = [
+            translator.f2w(f)
+            for f in self.detector.get_positions(
+                hsv,
+                len(self.expected_positions)
+            )
+        ]
 
-        if len(self.detected_positions) != len(self.positions):
+        if len(self.detected_positions) != len(self.expected_positions):
             return self.NOT_DETECTED
         else:
             if self.close_to_detected():
@@ -68,10 +79,16 @@ class VerifyPositionQuery(Query):
             return self.OUT_OF_POSITION
 
     def close_to_detected(self) -> bool:
-        flat_detected = [p for i in sorted(self.detected_positions) for p in i]
-        flat_expected = [p for i in sorted(self.positions) for p in i]
-
-        return np.allclose(flat_detected, flat_expected, rtol=5.0, atol=5.0)
+        tol = 5.0
+        for e in self.expected_positions:
+            found = False
+            for d in self.detected_positions:
+                if abs(e[0] - d[0]) < tol and abs(e[1] - d[1]) < tol:
+                    found = True
+                    break
+            if not found:
+                return False
+        return True
 
     def draw(self, debug_window):
         for p in self.detected_positions:
@@ -79,7 +96,7 @@ class VerifyPositionQuery(Query):
                 world_coordinates=p,
                 color=((self.color.h_low + self.color.h_high) / 2,
                        self.color.sv_low, 255))
-        for p in self.positions:
+        for p in self.expected_positions:
             debug_window.draw_circle(
                 world_coordinates=p,
                 color=((self.color.h_low + self.color.h_high) / 2,
