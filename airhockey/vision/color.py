@@ -1,3 +1,5 @@
+from typing import List
+
 import cv2
 import numpy as np
 
@@ -30,11 +32,10 @@ class ColorRange(object):
 
 
 class ColorDetector(object):
-    def __init__(self, *, color_range: ColorRange, translator):
+    def __init__(self, *, color_range: ColorRange):
         self.color_range = color_range
-        self.translator = translator
 
-    def get_positions(self, hsv, number_of_results, frame) -> list:
+    def get_positions(self, hsv, number_of_results) -> List:
         lower_color = np.array([self.color_range.h_low,
                                 self.color_range.sv_low,
                                 self.color_range.sv_low])
@@ -56,8 +57,8 @@ class ColorDetector(object):
                 break
 
             M = cv2.moments(sorted_contours[i][1])
-            cX = int(M["m10"] / (M["m00"] + 0.00001))
-            cY = int(M["m01"] / (M["m00"] + 0.00001))
-            result.append(self.translator.f2w((cX, cY)))
+            frameX = int(M["m10"] / (M["m00"] + 0.00001))
+            frameY = int(M["m01"] / (M["m00"] + 0.00001))
+            result.append((frameX, frameY))
 
         return result

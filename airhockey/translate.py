@@ -17,7 +17,7 @@ class WorldToFrameTranslator(object):
         f_y = int(w[1] / self.vertical_ratio + self.vertical_margin)
         return f_x, f_y
 
-    def f2w(self, f: Tuple) -> Tuple[float, float]:
+    def f2w(self, f: Tuple[int, int]) -> Tuple[float, float]:
         w_x = (f[0] - self.horizontal_margin) * self.horizontal_ratio
         w_y = (f[1] - self.vertical_margin) * self.vertical_ratio
         return w_x, w_y

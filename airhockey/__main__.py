@@ -38,8 +38,8 @@ table_markers_color_range = ColorRange(name="Table Markers",
                                        sv_low=53)
 
 puck_color_range = ColorRange(name="Puck",
-                              h_low=30,
-                              h_high=40,
+                              h_low=49,
+                              h_high=69,
                               sv_low=53)
 
 robot_pusher_color_range = ColorRange(name="Robot Pusher",
@@ -66,7 +66,8 @@ detect_table_handler = DetectTableHandler(
     color_range=table_markers_color_range,
     vision_query_context=vision_query_context,
     tries=500,
-    delay=1
+    delay=1,
+    success_retries=10
     )
 
 detect_players_handler = DetectPlayersHandler(

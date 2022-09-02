@@ -8,13 +8,16 @@ class DetectTableHandler(object):
     FAIL = "FAIL"
     SUCCESS = "SUCCESS"
 
-    def __init__(self, *,
-                 expected_markers: list,
-                 color_range: ColorRange,
-                 vision_query_context: QueryContext,
-                 tries: int,
-                 delay: int
-                 ):
+    def __init__(
+            self, *,
+             expected_markers: list,
+             color_range: ColorRange,
+             vision_query_context: QueryContext,
+             tries: int,
+             delay: int,
+             success_retries: int
+    ) -> None:
+        self.max_success_retries = success_retries
         self.expected_markers = expected_markers
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)
@@ -26,6 +29,7 @@ class DetectTableHandler(object):
     def __call__(self):
         i = 0
         t = Timeout(self.delay)
+        success_retries = 0
         while True:
             with self.vision_query_context as context:
                 result = context.query(VerifyPositionQuery(
@@ -42,7 +46,12 @@ class DetectTableHandler(object):
                 self.logger.info("Detecting table...")
                 if result == VerifyPositionQuery.SUCCESS:
                     self.logger.info("Table markers detected.")
-                    return self.SUCCESS
+                    success_retries += 1
+                    if success_retries >= self.max_success_retries:
+                        return self.SUCCESS
+                    else:
+                        continue
+
                 elif result == VerifyPositionQuery.OUT_OF_POSITION:
                     self.logger.info("Table markers are out of position.")
                 elif result == VerifyPositionQuery.NOT_DETECTED:

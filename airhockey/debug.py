@@ -22,8 +22,8 @@ class DebugWindowLogHandler(logging.Handler):
         for m in self.messages:
             for index, line in enumerate(textwrap.wrap(m, 90)):
                 cv2.putText(frame, line,
-                            (10, y_start + line_num * 50 - index * 20 + 40),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (150, 255, 150),
+                            (500, y_start + line_num * 40 - index * 15 + 40),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (150, 255, 150),
                             thickness=2)
                 line_num += 1
 
@@ -50,17 +50,36 @@ class DebugWindow(object):
 
         for r in color_ranges:
             cv2.createTrackbar('{name} H Low'.format(name=r.name), self.name,
-                               0, 179, lambda x: r.set_h_low(x))
+                               0, 179, r.set_h_low)
             cv2.setTrackbarPos('{name} H Low'.format(name=r.name), self.name,
                                r.h_low)
             cv2.createTrackbar('{name} H High'.format(name=r.name), self.name,
-                               0, 179, lambda x: r.set_h_high(x))
+                               0, 179, r.set_h_high)
             cv2.setTrackbarPos('{name} H High'.format(name=r.name), self.name,
                                r.h_high)
             cv2.createTrackbar('{name} SV Low'.format(name=r.name), self.name,
-                               0, 255, lambda x: r.set_sv_low(x))
+                               0, 255, r.set_sv_low)
             cv2.setTrackbarPos('{name} SV Low'.format(name=r.name), self.name,
                                r.sv_low)
+
+    def draw_color_previews(self, target, y_start):
+        width = 200
+        height = 50
+        for index, r in enumerate(self.color_ranges):
+            preview = np.zeros((height, width, 4), np.uint8)
+            preview_hsv = np.zeros((preview.shape[0], preview.shape[1], 3), np.uint8)
+
+            for row in range(0, height):
+                sv = r.sv_low + (255 - r.sv_low) / height * row
+                for col in range(0, width):
+                    h = r.h_low + (r.h_high - r.h_low) / width * col
+                    preview_hsv[row][col] = [h, sv, sv]
+            preview[:, :, :3] = cv2.cvtColor(preview_hsv, cv2.COLOR_HSV2BGR)
+
+            offset = (y_start + index * (height + 10), 0)
+            target[offset[0]:offset[0] + preview.shape[0],
+                   offset[1]:offset[1] + preview.shape[1]] = preview
+
 
     def set_frame(self, frame, hsv):
         self.frame = frame
@@ -76,6 +95,7 @@ class DebugWindow(object):
         target = np.zeros((h + 300, w + 300, d), np.uint8)
         target[0:h, 0:w] = self.frame
         self.log_handler.draw(target, h)
+        self.draw_color_previews(target, h)
         cv2.imshow(self.name, target)
 
         # for r in self.color_ranges:

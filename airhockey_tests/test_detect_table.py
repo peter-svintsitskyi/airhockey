@@ -15,7 +15,7 @@ class TestDetectTableHandler(unittest.TestCase):
         self.log_spy = init_spy_log_handler(
             airhockey.handlers.detect_table.__name__)
 
-    def make_calibrate_handler(self, *, tries, delay):
+    def make_detect_table_handler(self, *, tries, delay):
         self.grabbed_frame = numpy.zeros((100, 100, 3), numpy.uint8)
         self.frame_reader = FrameReader()
         self.frame_reader.read = MagicMock(return_value=self.grabbed_frame)
@@ -24,15 +24,17 @@ class TestDetectTableHandler(unittest.TestCase):
                                           frame_reader=self.frame_reader,
                                           debug_window=None)
         self.color_range = ColorRange(name="", h_low=0, h_high=0, sv_low=0)
-        self.calibrate_handler = DetectTableHandler(
+        self.detect_table_handler = DetectTableHandler(
             expected_markers=self.expected_markers,
             color_range=self.color_range,
             vision_query_context=self.query_context,
             tries=tries,
-            delay=delay)
+            delay=delay,
+            success_retries=3
+        )
 
     def test_handler_returns_failure_when_no_markers_detected(self):
-        self.make_calibrate_handler(tries=3, delay=0)
+        self.make_detect_table_handler(tries=3, delay=0)
         logger = logging.getLogger(airhockey.handlers.detect_table.__name__)
         self.assertEqual(logging.INFO, logger.getEffectiveLevel())
 
@@ -41,7 +43,7 @@ class TestDetectTableHandler(unittest.TestCase):
 
         self.query_context.query = MagicMock(
             return_value=VerifyPositionQuery.NOT_DETECTED)
-        self.assertEqual(DetectTableHandler.FAIL, self.calibrate_handler())
+        self.assertEqual(DetectTableHandler.FAIL, self.detect_table_handler())
         self.assertListEqual(
             [
                 "Detecting table...",
@@ -58,10 +60,10 @@ class TestDetectTableHandler(unittest.TestCase):
         self.query_context.query.assert_called_with(expected_query)
 
     def test_can_configure_number_of_retries_and_delay(self):
-        self.make_calibrate_handler(tries=2, delay=0.01)
+        self.make_detect_table_handler(tries=2, delay=0.01)
         self.query_context.query = MagicMock(
             return_value=VerifyPositionQuery.NOT_DETECTED)
-        self.assertEqual(DetectTableHandler.FAIL, self.calibrate_handler())
+        self.assertEqual(DetectTableHandler.FAIL, self.detect_table_handler())
         self.assertListEqual(
             [
                 "Detecting table...",
@@ -73,10 +75,10 @@ class TestDetectTableHandler(unittest.TestCase):
         )
 
     def test_returns_failure_when_markers_detected_in_wrong_position(self):
-        self.make_calibrate_handler(tries=1, delay=0)
+        self.make_detect_table_handler(tries=1, delay=0)
         self.query_context.query = MagicMock(
             return_value=VerifyPositionQuery.OUT_OF_POSITION)
-        self.assertEqual(DetectTableHandler.FAIL, self.calibrate_handler())
+        self.assertEqual(DetectTableHandler.FAIL, self.detect_table_handler())
         self.assertListEqual(
             [
                 "Detecting table...",
@@ -86,14 +88,21 @@ class TestDetectTableHandler(unittest.TestCase):
         )
 
     def test_returns_success_when_markers_are_in_correct_position(self):
-        self.make_calibrate_handler(tries=1, delay=0)
+        self.make_detect_table_handler(tries=3, delay=0)
         self.query_context.query = MagicMock(
             return_value=VerifyPositionQuery.SUCCESS)
-        self.assertEqual(DetectTableHandler.SUCCESS, self.calibrate_handler())
+        self.assertEqual(
+            DetectTableHandler.SUCCESS,
+            self.detect_table_handler()
+        )
         self.assertListEqual(
             [
                 "Detecting table...",
                 "Table markers detected.",
+                "Detecting table...",
+                "Table markers detected.",
+                "Detecting table...",
+                "Table markers detected."
             ],
             self.log_spy.messages
         )
