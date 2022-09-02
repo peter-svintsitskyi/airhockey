@@ -1,9 +1,6 @@
 import cv2
 import abc
 
-import numpy
-import numpy as np
-
 from airhockey.debug import DebugWindow
 from typing import Optional, Tuple, List
 
@@ -16,7 +13,12 @@ class Query(object):
     __metaclass__ = abc.ABCMeta
 
     @abc.abstractmethod
-    def execute(self, hsv, translator, debug_window): raise NotImplementedError
+    def execute(
+            self,
+            hsv,
+            translator: WorldToFrameTranslator,
+            debug_window
+    ): raise NotImplementedError
 
     @abc.abstractmethod
     def draw(self, frame): raise NotImplementedError
@@ -26,11 +28,15 @@ class VerifyPresenceQuery(Query):
     NOT_PRESENT = "NOT_PRESENT"
     PRESENT = "PRESENT"
 
-    def __init__(self, color_range):
+    def __init__(self, color_range: ColorRange):
         self.color_range = color_range
+        self.detector = ColorDetector(color_range=self.color_range)
 
-    def execute(self, hsv, translator, debug_window):
-        pass
+    def execute(self, hsv, translator: WorldToFrameTranslator, debug_window):
+        if len(self.detector.get_positions(hsv, 1)) > 0:
+            return self.PRESENT
+
+        return self.NOT_PRESENT
 
     def draw(self, frame):
         pass

@@ -3,7 +3,7 @@ from typing import Tuple, List
 
 from airhockey.translate import WorldToFrameTranslator
 from airhockey.vision.color import ColorRange, ColorDetector
-from airhockey.vision.query import VerifyPositionQuery
+from airhockey.vision.query import VerifyPositionQuery, VerifyPresenceQuery
 
 
 class FakeDetector(ColorDetector):
@@ -109,3 +109,21 @@ class TestVerifyPositionQuery(unittest.TestCase):
         )
         query.detector = FakeDetector(detected_frame_positions)
         return query
+
+
+class TestVerifyPresenceQuery(unittest.TestCase):
+    def test_not_present(self):
+        query = VerifyPresenceQuery(
+            color_range=ColorRange(name="test", h_low=0, h_high=255, sv_low=0)
+        )
+        query.detector = FakeDetector([])
+        result = query.execute(None, AddFiftyFakeTranslator(), None)
+        self.assertEqual(VerifyPresenceQuery.NOT_PRESENT, result)
+
+    def test_present(self):
+        query = VerifyPresenceQuery(
+            color_range=ColorRange(name="test", h_low=0, h_high=255, sv_low=0)
+        )
+        query.detector = FakeDetector([(100, 100), (200, 200)])
+        result = query.execute(None, AddFiftyFakeTranslator(), None)
+        self.assertEqual(VerifyPresenceQuery.PRESENT, result)
