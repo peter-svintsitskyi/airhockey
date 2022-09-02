@@ -58,6 +58,7 @@ function createMainWindow() {
             contextIsolation: false
         }
     })
+    window.setPosition(73, 131);
 
     if (isDevelopment) {
         window.webContents.openDevTools()
