@@ -109,7 +109,6 @@ class DebugWindow(object):
         hsv_color = np.uint8([[color]])
         bgr_color = cv2.cvtColor(hsv_color, cv2.COLOR_HSV2BGR)[0][0]
         bgr_color = (int(bgr_color[0]), int(bgr_color[1]), int(bgr_color[2]))
-        bgr_color = (0, 0, 255)
         c = self.translator.w2f(world_coordinates)
         cv2.circle(self.frame, c, 10, bgr_color, -1)
 

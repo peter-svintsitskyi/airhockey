@@ -87,7 +87,7 @@ class TestVerifyPositionQuery(unittest.TestCase):
     def test_out_of_position(self):
         query = self._create_query(
             expected_world_positions=[(50, 50), (150, 150), (250, 250)],
-            detected_frame_positions=[(210, 210), (1, 10), (100, 100)]
+            detected_frame_positions=[(210, 210), (1, 10), (300, 300)]
         )
         self.assertEqual(
             VerifyPositionQuery.OUT_OF_POSITION,

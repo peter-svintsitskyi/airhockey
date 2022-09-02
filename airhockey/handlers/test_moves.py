@@ -30,10 +30,10 @@ class TestMovesHandler:
 
     def __call__(self, *args, **kwargs):
         with self.robot:
-            with self.vision_query_context as context:
-                for destination in self.destinations:
-                    self._move(destination)
-                    time.sleep(self.delay)
+            for destination in self.destinations:
+                self._move(destination)
+                time.sleep(self.delay)
+                with self.vision_query_context as context:
                     if not self._verify_pusher_position(context, destination):
                         return self.FAIL
 

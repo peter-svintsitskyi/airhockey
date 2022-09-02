@@ -85,7 +85,7 @@ class VerifyPositionQuery(Query):
             return self.OUT_OF_POSITION
 
     def close_to_detected(self) -> bool:
-        tol = 5.0
+        tol = 15.0
         for e in self.expected_positions:
             found = False
             for d in self.detected_positions:

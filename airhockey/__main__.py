@@ -97,7 +97,7 @@ test_moves_handler = TestMovesHandler(
     robot=Robot(host=robot_host, port=robot_port),
     vision_query_context=vision_query_context,
     robot_pusher_color_range=robot_pusher_color_range,
-    delay=2
+    delay=3
 )
 
 failed_handler = FailedHandler()
