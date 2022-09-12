@@ -6,6 +6,7 @@ from airhockey.handlers.check_network import CheckNetworkHandler
 from airhockey.handlers.detect_players import DetectPlayersHandler
 from airhockey.handlers.detect_table import DetectTableHandler
 from airhockey.handlers.failed import FailedHandler
+from airhockey.handlers.play_game import PlayGameHandler
 from airhockey.handlers.test_moves import TestMovesHandler
 from airhockey.robot import Robot
 from airhockey.vision.video import ScreenCapture
@@ -100,6 +101,12 @@ test_moves_handler = TestMovesHandler(
     delay=3
 )
 
+play_game_handler = PlayGameHandler(
+    vision_query_context=vision_query_context,
+    puck_color_range=puck_color_range,
+    pusher_color_range=robot_pusher_color_range
+)
+
 failed_handler = FailedHandler()
 
 FAILED_STATE = "FAILED_STATE"
@@ -113,7 +120,7 @@ PLAY_GAME = "PLAY_GAME"
 state_transitions = {
     FAILED_STATE: (failed_handler, {}),
     AWAIT_VIDEO: (await_video_handler, {
-        await_video_handler.SUCCESS: DETECT_TABLE,
+        await_video_handler.SUCCESS: PLAY_GAME,
         await_video_handler.TIMEOUT: FAILED_STATE,
     }),
     DETECT_TABLE: (detect_table_handler, {
@@ -129,9 +136,13 @@ state_transitions = {
         check_network_handler.FAIL: FAILED_STATE
     }),
     TEST_MOVES: (test_moves_handler, {
-        check_network_handler.SUCCESS: PLAY_GAME,
-        check_network_handler.FAIL: FAILED_STATE
+        test_moves_handler.SUCCESS: PLAY_GAME,
+        test_moves_handler.FAIL: FAILED_STATE
     }),
+    PLAY_GAME: (play_game_handler, {
+        play_game_handler.SUCCESS: FAILED_STATE,
+        play_game_handler.FAIL: FAILED_STATE
+    })
 }
 
 controller = Controller(AWAIT_VIDEO, FAILED_STATE)

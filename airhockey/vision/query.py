@@ -24,6 +24,20 @@ class Query(object):
     def draw(self, frame): raise NotImplementedError
 
 
+class PositionQuery(Query):
+    def __init__(self, color_range: ColorRange):
+        self.color_range = color_range
+        self.detector = ColorDetector(color_range=self.color_range)
+
+    def execute(self, hsv, translator: WorldToFrameTranslator, debug_window):
+        positions = self.detector.get_positions(hsv, 1)
+        if len(positions) > 0:
+            return translator.f2w(positions[0])
+        return None
+
+    def draw(self, debug_window):
+        ...
+
 class VerifyPresenceQuery(Query):
     NOT_PRESENT = "NOT_PRESENT"
     PRESENT = "PRESENT"
