@@ -2,7 +2,7 @@ import cv2
 import abc
 
 from airhockey.debug import DebugWindow
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Any
 
 from airhockey.translate import WorldToFrameTranslator
 from airhockey.vision.color import ColorRange, ColorDetector
@@ -37,6 +37,7 @@ class PositionQuery(Query):
 
     def draw(self, debug_window):
         ...
+
 
 class VerifyPresenceQuery(Query):
     NOT_PRESENT = "NOT_PRESENT"
@@ -150,7 +151,7 @@ class QueryContext(object):
         self.frame = None
         self.frame_hsv = None
 
-    def query(self, query: Query) -> str:
+    def query(self, query: Query) -> Any:
         if not self.can_execute:
             raise RuntimeError(
                 'Cannot execute a query from inactive context')

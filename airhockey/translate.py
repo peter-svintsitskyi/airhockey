@@ -1,23 +1,30 @@
 from typing import Tuple
+import numpy as np
 
 
 class WorldToFrameTranslator(object):
-    def __init__(self, frame_size, table_size):
-        self.frame_width, self.frame_height = frame_size
-        self.table_width, self.table_height = table_size
-        self.horizontal_margin = 10
-        frame_field_width = self.frame_width - self.horizontal_margin * 2
-        frame_field_height = frame_field_width / 2
-        self.vertical_margin = (self.frame_height - frame_field_height) / 2
-        self.horizontal_ratio = self.table_width / frame_field_width
-        self.vertical_ratio = self.table_height / frame_field_height
+    def __init__(self, video_size, table_size):
+        video_width, video_height = video_size
+        table_width, table_height = table_size
+        horizontal_margin = 32
+        frame_width = video_width - horizontal_margin * 2
+        frame_height = frame_width / 2
+        vertical_margin = (video_height - frame_height) / 2
+
+        ratio = table_width / frame_width
+
+        self.frame_to_world = [
+            [ratio,     0, -horizontal_margin],
+            [0,     ratio,   -vertical_margin],
+            [0,         0,              ratio],
+        ]
+
+        self.world_to_frame = np.linalg.inv(self.frame_to_world)
 
     def w2f(self, w: Tuple[float, float]) -> Tuple[int, int]:
-        f_x = int(w[0] / self.horizontal_ratio + self.horizontal_margin)
-        f_y = int(w[1] / self.vertical_ratio + self.vertical_margin)
-        return f_x, f_y
+        res = np.matmul(self.world_to_frame, [w[0], w[1], 1])
+        return int(res[0]), int(res[1])
 
     def f2w(self, f: Tuple[int, int]) -> Tuple[float, float]:
-        w_x = (f[0] - self.horizontal_margin) * self.horizontal_ratio
-        w_y = (f[1] - self.vertical_margin) * self.vertical_ratio
-        return w_x, w_y
+        res = np.matmul(self.frame_to_world,  [f[0], f[1], 1])
+        return res[0], res[1]
