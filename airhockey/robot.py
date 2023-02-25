@@ -27,4 +27,5 @@ class Robot(object):
                 'Cannot move robot when the context is not active')
         x, y = dst
         self.destination = dst
-        self.sock.sendto(struct.pack('<ii', x, y), (self.host, self.port))
+        self.sock.sendto(
+            struct.pack('<ii', int(x), int(y)), (self.host, self.port))

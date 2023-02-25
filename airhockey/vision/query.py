@@ -2,7 +2,7 @@ import cv2
 import abc
 
 from airhockey.debug import DebugWindow
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Any
 
 from airhockey.translate import WorldToFrameTranslator
 from airhockey.vision.color import ColorRange, ColorDetector
@@ -22,6 +22,21 @@ class Query(object):
 
     @abc.abstractmethod
     def draw(self, frame): raise NotImplementedError
+
+
+class PositionQuery(Query):
+    def __init__(self, color_range: ColorRange):
+        self.color_range = color_range
+        self.detector = ColorDetector(color_range=self.color_range)
+
+    def execute(self, hsv, translator: WorldToFrameTranslator, debug_window):
+        positions = self.detector.get_positions(hsv, 1)
+        if len(positions) > 0:
+            return translator.f2w(positions[0])
+        return None
+
+    def draw(self, debug_window):
+        ...
 
 
 class VerifyPresenceQuery(Query):
@@ -132,11 +147,11 @@ class QueryContext(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.can_execute = False
         if self.debug_window is not None:
-            self.debug_window.draw(self.queries)
+            self.debug_window.draw(self.queries, self.frame_reader)
         self.frame = None
         self.frame_hsv = None
 
-    def query(self, query: Query) -> str:
+    def query(self, query: Query) -> Any:
         if not self.can_execute:
             raise RuntimeError(
                 'Cannot execute a query from inactive context')

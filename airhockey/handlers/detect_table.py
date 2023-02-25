@@ -10,12 +10,12 @@ class DetectTableHandler(object):
 
     def __init__(
             self, *,
-             expected_markers: list,
-             color_range: ColorRange,
-             vision_query_context: QueryContext,
-             tries: int,
-             delay: int,
-             success_retries: int
+            expected_markers: list,
+            color_range: ColorRange,
+            vision_query_context: QueryContext,
+            tries: int,
+            delay: int,
+            success_retries: int
     ) -> None:
         self.max_success_retries = success_retries
         self.expected_markers = expected_markers

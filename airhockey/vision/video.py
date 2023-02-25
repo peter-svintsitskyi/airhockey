@@ -9,12 +9,26 @@ import abc
 class FrameReader(object):
     __metaclass__ = abc.ABCMeta
 
+    def __init__(self):
+        self.frames_grabbed = 0
+        self.frames_read = 0
+
     @abc.abstractmethod
     def read(self): raise NotImplementedError
+
+    @abc.abstractmethod
+    def stream_fps(self):
+        ...
+
+    @abc.abstractmethod
+    def read_fps(self):
+        ...
 
 
 class VideoStream(FrameReader):
     def __init__(self, path, frame_dimensions):
+        super().__init__()
+
         frame_width, frame_height = frame_dimensions
         self.stream = cv2.VideoCapture(path)
         self.stream.set(cv2.CAP_PROP_FRAME_WIDTH, frame_width)
@@ -22,8 +36,6 @@ class VideoStream(FrameReader):
         self.stream.set(cv2.CAP_PROP_FPS, 30)
         self.stopped = False
         self.frame = None
-        self.frames_grabbed = 0
-        self.frames_read = 0
         self.time_started = time.time()
         self.has_grabbed_frame = False
         self.read_lock = Lock()
@@ -74,14 +86,13 @@ class VideoStream(FrameReader):
 
 class ScreenCapture(FrameReader):
     def __init__(self, frame_dimensions):
+        super().__init__()
         width, height = frame_dimensions
         self.bounding_box = {'top': 150, 'left': 100, 'width': width / 2,
                              'height': height / 2}
         self.sct = mss()
         self.stopped = False
         self.frame = None
-        self.frames_grabbed = 0
-        self.frames_read = 0
         self.time_started = time.time()
         self.has_grabbed_frame = False
         self.read_lock = Lock()

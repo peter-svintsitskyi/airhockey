@@ -1,4 +1,5 @@
 import logging
+import sys
 
 from airhockey.controller import Controller
 from airhockey.handlers.await_video import AwaitVideoHandler
@@ -6,9 +7,10 @@ from airhockey.handlers.check_network import CheckNetworkHandler
 from airhockey.handlers.detect_players import DetectPlayersHandler
 from airhockey.handlers.detect_table import DetectTableHandler
 from airhockey.handlers.failed import FailedHandler
+from airhockey.handlers.play_game import PlayGameHandler
 from airhockey.handlers.test_moves import TestMovesHandler
 from airhockey.robot import Robot
-from airhockey.vision.video import ScreenCapture
+from airhockey.vision.video import ScreenCapture, VideoStream
 from airhockey.vision.color import ColorRange
 from airhockey.vision.query import QueryContext
 from airhockey.translate import WorldToFrameTranslator
@@ -25,12 +27,17 @@ logger.info("Welcome")
 
 robot_host = 'localhost'
 robot_port = 1133
+robot = Robot(host=robot_host, port=robot_port)
 
+puck_radius = 20
 table_size = (1200, 600)
-frame_size = (1280, 768)
-video_stream = ScreenCapture(frame_size)
-# video_stream = VideoStream(0, frame_size)
-translator = WorldToFrameTranslator(frame_size, table_size)
+video_size = (1280, 768)
+puck_workspace = table_size
+
+video_stream = VideoStream(0, video_size) \
+    if 'video' in sys.argv else ScreenCapture(video_size)
+
+translator = WorldToFrameTranslator(video_size, table_size)
 
 table_markers_color_range = ColorRange(name="Table Markers",
                                        h_low=84,
@@ -62,12 +69,12 @@ vision_query_context = QueryContext(translator=translator,
 await_video_handler = AwaitVideoHandler(video_stream=video_stream, timeout=10)
 
 detect_table_handler = DetectTableHandler(
-    expected_markers=[(400, 0), (400, 600)],
+    expected_markers=[(400, -15), (400, 615)],
     color_range=table_markers_color_range,
     vision_query_context=vision_query_context,
     tries=500,
     delay=1,
-    success_retries=10
+    success_retries=1
     )
 
 detect_players_handler = DetectPlayersHandler(
@@ -94,10 +101,18 @@ test_moves_handler = TestMovesHandler(
         (50, 50),
         (300, 300),
     ],
-    robot=Robot(host=robot_host, port=robot_port),
+    robot=robot,
     vision_query_context=vision_query_context,
     robot_pusher_color_range=robot_pusher_color_range,
     delay=3
+)
+
+play_game_handler = PlayGameHandler(
+    robot=robot,
+    vision_query_context=vision_query_context,
+    puck_color_range=puck_color_range,
+    pusher_color_range=robot_pusher_color_range,
+    puck_workspace=puck_workspace
 )
 
 failed_handler = FailedHandler()
@@ -125,13 +140,17 @@ state_transitions = {
         detect_players_handler.FAIL: FAILED_STATE,
     }),
     CHECK_NETWORK: (check_network_handler, {
-        check_network_handler.SUCCESS: TEST_MOVES,
-        check_network_handler.FAIL: FAILED_STATE
-    }),
-    TEST_MOVES: (test_moves_handler, {
         check_network_handler.SUCCESS: PLAY_GAME,
         check_network_handler.FAIL: FAILED_STATE
     }),
+    # TEST_MOVES: (test_moves_handler, {
+    #     test_moves_handler.SUCCESS: PLAY_GAME,
+    #     test_moves_handler.FAIL: FAILED_STATE
+    # }),
+    PLAY_GAME: (play_game_handler, {
+        play_game_handler.SUCCESS: FAILED_STATE,
+        play_game_handler.FAIL: FAILED_STATE
+    })
 }
 
 controller = Controller(AWAIT_VIDEO, FAILED_STATE)

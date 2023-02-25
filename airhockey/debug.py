@@ -5,6 +5,8 @@ import numpy as np
 from airhockey.vision.color import ColorRange
 import textwrap
 
+from airhockey.vision.video import FrameReader
+
 
 class DebugWindowLogHandler(logging.Handler):
     def __init__(self):
@@ -49,43 +51,37 @@ class DebugWindow(object):
         logger.addHandler(self.log_handler)
 
         for r in color_ranges:
-            cv2.createTrackbar('{name} H Low'.format(name=r.name), self.name,
-                               0, 179, r.set_h_low)
-            cv2.setTrackbarPos('{name} H Low'.format(name=r.name), self.name,
-                               r.h_low)
-            cv2.createTrackbar('{name} H High'.format(name=r.name), self.name,
-                               0, 179, r.set_h_high)
-            cv2.setTrackbarPos('{name} H High'.format(name=r.name), self.name,
-                               r.h_high)
-            cv2.createTrackbar('{name} SV Low'.format(name=r.name), self.name,
-                               0, 255, r.set_sv_low)
-            cv2.setTrackbarPos('{name} SV Low'.format(name=r.name), self.name,
-                               r.sv_low)
+            cv2.createTrackbar(f'{r.name} H Low', self.name,
+                               r.h_low, 179, r.set_h_low)
+            cv2.createTrackbar(f'{r.name} H High', self.name,
+                               r.h_high, 179, r.set_h_high)
+            cv2.createTrackbar(f'{r.name} SV Low', self.name,
+                               r.sv_low, 255, r.set_sv_low)
 
     def draw_color_previews(self, target, y_start):
         width = 200
         height = 50
         for index, r in enumerate(self.color_ranges):
-            preview = np.zeros((height, width, 4), np.uint8)
-            preview_hsv = np.zeros((preview.shape[0], preview.shape[1], 3), np.uint8)
+            preview_hsv = np.zeros((height, width, 3), np.uint8)
 
             for row in range(0, height):
                 sv = r.sv_low + (255 - r.sv_low) / height * row
                 for col in range(0, width):
                     h = r.h_low + (r.h_high - r.h_low) / width * col
-                    preview_hsv[row][col] = [h, sv, sv]
-            preview[:, :, :3] = cv2.cvtColor(preview_hsv, cv2.COLOR_HSV2BGR)
+                    preview_hsv[row, col] = [h, sv, sv]
+
+            preview = cv2.cvtColor(preview_hsv, cv2.COLOR_HSV2BGR,
+                                   dstCn=target.shape[2])
 
             offset = (y_start + index * (height + 10), 0)
             target[offset[0]:offset[0] + preview.shape[0],
                    offset[1]:offset[1] + preview.shape[1]] = preview
 
-
     def set_frame(self, frame, hsv):
         self.frame = frame
         self.hsv = hsv
 
-    def draw(self, queries: list):
+    def draw(self, queries: list, frame_reader: FrameReader):
         for query in queries:
             query.draw(self)
         cv2.rectangle(self.frame, self.translator.w2f((0, 0)),
@@ -96,6 +92,7 @@ class DebugWindow(object):
         target[0:h, 0:w] = self.frame
         self.log_handler.draw(target, h)
         self.draw_color_previews(target, h)
+        self.draw_fps(target, frame_reader)
         cv2.imshow(self.name, target)
 
         # for r in self.color_ranges:
@@ -111,6 +108,14 @@ class DebugWindow(object):
         bgr_color = (int(bgr_color[0]), int(bgr_color[1]), int(bgr_color[2]))
         c = self.translator.w2f(world_coordinates)
         cv2.circle(self.frame, c, 10, bgr_color, -1)
+
+    def draw_fps(self, target, frame_reader: FrameReader):
+        cv2.putText(target, str("Stream: {0}/{1:.2f} fps".format(
+            frame_reader.frames_grabbed, frame_reader.stream_fps())), (10, 45),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), thickness=2)
+        cv2.putText(target, str("Processed: {0}/{1:.2f} fps".format(
+            frame_reader.frames_read, frame_reader.read_fps())), (430, 45),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), thickness=2)
 
 
 class Debug(object):
