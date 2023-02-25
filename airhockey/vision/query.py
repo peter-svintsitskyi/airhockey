@@ -147,7 +147,7 @@ class QueryContext(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.can_execute = False
         if self.debug_window is not None:
-            self.debug_window.draw(self.queries)
+            self.debug_window.draw(self.queries, self.frame_reader)
         self.frame = None
         self.frame_hsv = None
 

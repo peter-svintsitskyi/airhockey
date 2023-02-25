@@ -49,12 +49,13 @@ class PlayGameHandler:
                     )
                     self.trajectory.register_position(puck_position)
 
-                    interception_points = self.trajectory.calculate_interception_points()
+                    interception_points = self.trajectory.\
+                        calculate_interception_points()
                     if interception_points:
                         dx = puck_position[0] - pusher_position[0]
                         dy = puck_position[1] - pusher_position[1]
                         distance_to_puck = math.sqrt(pow(dx, 2) + pow(dy, 2))
-                        print(distance_to_puck)
+
                         if (distance_to_puck < 200):
                             self.robot.move(
                                 (int(pusher_position[0] + dx * 4),

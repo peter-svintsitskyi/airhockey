@@ -1,5 +1,5 @@
 import math
-from typing import Tuple
+from typing import Tuple, Optional
 
 import numpy as np
 from sklearn import preprocessing
@@ -30,7 +30,7 @@ class Trajectory:
     def __init__(self, workspace: Tuple[float, float]):
         self.workspace = workspace
         self.calculator = DirectionCalculator()
-        self.position = None
+        self.position: Optional[Tuple[float, float]] = None
         self.direction = None
 
     def calculate_interception_points(self):

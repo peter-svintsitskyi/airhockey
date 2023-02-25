@@ -1,4 +1,5 @@
 import logging
+import sys
 
 from airhockey.controller import Controller
 from airhockey.handlers.await_video import AwaitVideoHandler
@@ -9,7 +10,7 @@ from airhockey.handlers.failed import FailedHandler
 from airhockey.handlers.play_game import PlayGameHandler
 from airhockey.handlers.test_moves import TestMovesHandler
 from airhockey.robot import Robot
-from airhockey.vision.video import ScreenCapture
+from airhockey.vision.video import ScreenCapture, VideoStream
 from airhockey.vision.color import ColorRange
 from airhockey.vision.query import QueryContext
 from airhockey.translate import WorldToFrameTranslator
@@ -32,8 +33,10 @@ puck_radius = 20
 table_size = (1200, 600)
 video_size = (1280, 768)
 puck_workspace = table_size
-video_stream = ScreenCapture(video_size)
-# video_stream = VideoStream(0, frame_size)
+
+video_stream = VideoStream(0, video_size) \
+    if 'video' in sys.argv else ScreenCapture(video_size)
+
 translator = WorldToFrameTranslator(video_size, table_size)
 
 table_markers_color_range = ColorRange(name="Table Markers",
