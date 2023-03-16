@@ -11,15 +11,15 @@ class WorldToFrameTranslator(object):
         frame_height = frame_width / 2
         vertical_margin = (video_height - frame_height) / 2
 
-        ratio = table_width / frame_width
+        ratio = frame_width / table_width
 
-        self.frame_to_world = [
-            [ratio,     0, -horizontal_margin],
-            [0,     ratio,   -vertical_margin],
-            [0,         0,              ratio],
+        self.world_to_frame = [
+            [ratio,     0,  horizontal_margin],
+            [0,     ratio,    vertical_margin],
+            [0,         0,              1],
         ]
 
-        self.world_to_frame = np.linalg.inv(self.frame_to_world)
+        self.frame_to_world = np.linalg.inv(self.world_to_frame)
 
     def w2f(self, w: Tuple[float, float]) -> Tuple[int, int]:
         res = np.matmul(self.world_to_frame, [w[0], w[1], 1])

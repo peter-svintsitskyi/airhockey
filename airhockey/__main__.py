@@ -31,7 +31,7 @@ robot = Robot(host=robot_host, port=robot_port)
 
 puck_radius = 20
 table_size = (1200, 600)
-video_size = (1280, 768)
+video_size = (1280, 720)
 puck_workspace = table_size
 
 video_stream = VideoStream(0, video_size) \

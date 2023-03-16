@@ -29,11 +29,23 @@ class VideoStream(FrameReader):
     def __init__(self, path, frame_dimensions):
         super().__init__()
 
+        fps = 30
         frame_width, frame_height = frame_dimensions
         self.stream = cv2.VideoCapture(path)
         self.stream.set(cv2.CAP_PROP_FRAME_WIDTH, frame_width)
         self.stream.set(cv2.CAP_PROP_FRAME_HEIGHT, frame_height)
-        self.stream.set(cv2.CAP_PROP_FPS, 30)
+        self.stream.set(cv2.CAP_PROP_FPS, fps)
+
+        real_frame_width = self.stream.get(cv2.CAP_PROP_FRAME_WIDTH)
+        real_frame_height = self.stream.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        real_fps = int(self.stream.get(cv2.CAP_PROP_FPS))
+
+        assert real_frame_width == frame_width, \
+            f"{real_frame_width=} != {frame_width=}"
+        assert real_frame_height == frame_height, \
+            f"{real_frame_height=} != {frame_height=}"
+        assert real_fps == fps, f"{real_fps=} != {fps=}"
+
         self.stopped = False
         self.frame = None
         self.time_started = time.time()
