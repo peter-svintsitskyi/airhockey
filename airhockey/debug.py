@@ -84,9 +84,18 @@ class DebugWindow(object):
     def draw(self, queries: list, frame_reader: FrameReader):
         for query in queries:
             query.draw(self)
-        cv2.rectangle(self.frame, self.translator.w2f((0, 0)),
-                      self.translator.w2f(self.table_size),
-                      (0, 255, 255), 2)
+
+        points = [np.int32([
+            self.translator.w2f((0, 0)),
+            self.translator.w2f((1200, 0)),
+            self.translator.w2f((1200, 600)),
+            self.translator.w2f((0, 600)),
+        ]).reshape((-1, 1, 2))]
+
+        cv2.polylines(self.frame, points, True, (0, 255, 255), 2)
+
+        self.draw_circle((600, 300), (0, 0, 255))
+
         h, w, d = self.frame.shape
         target = np.zeros((h + 300, w + 300, d), np.uint8)
         target[0:h, 0:w] = self.frame

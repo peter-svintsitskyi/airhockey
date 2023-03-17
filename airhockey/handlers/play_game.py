@@ -47,6 +47,15 @@ class PlayGameHandler:
                     pusher_position = context.query(
                         PositionQuery(color_range=self.pusher_color_range)
                     )
+
+                    if puck_position is None:
+                        print("No puck")
+                        continue
+
+                    if pusher_position is None:
+                        print("No pusher")
+                        continue
+
                     self.trajectory.register_position(puck_position)
 
                     interception_points = self.trajectory.\

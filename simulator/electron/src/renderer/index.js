@@ -86,13 +86,21 @@ Application((app) => {
 
     const markerRender = { fill: '#00fff0', stroke: '#00ffff' }
 
-    const marker1 = world.createKinematicBody(Vec2(-2, 3 + RAIL_W / 2), 0)
+    const marker1 = world.createKinematicBody(Vec2(-width / 2 - RAIL_W / 2, 3 + RAIL_W / 2), 0)
     marker1.createFixture(pl.Circle(RAIL_W / 2), {});
     marker1.render = markerRender
 
-    const marker2 = world.createKinematicBody(Vec2(-2, -3 - RAIL_W / 2), 0)
+    const marker2 = world.createKinematicBody(Vec2(width / 2 + RAIL_W / 2, 3 + RAIL_W / 2), 0)
     marker2.createFixture(pl.Circle(RAIL_W / 2), {});
     marker2.render = markerRender
+
+    const marker3 = world.createKinematicBody(Vec2(-width / 2 - RAIL_W / 2, -3 - RAIL_W / 2), 0)
+    marker3.createFixture(pl.Circle(RAIL_W / 2), {});
+    marker3.render = markerRender
+
+    const marker4 = world.createKinematicBody(Vec2(width / 2 + RAIL_W / 2, -3  - RAIL_W / 2), 0)
+    marker4.createFixture(pl.Circle(RAIL_W / 2), {});
+    marker4.render = markerRender
 
 
     world.createBody().createFixture(pl.Polygon(railV.map(Vec2.scaleFn(+1, +1))), railFixDef);

@@ -11,7 +11,7 @@ const isDevelopment = process.env.NODE_ENV !== 'production'
 let mainWindow
 
 let m = 0
-const UDP_PORT = 1133
+const UDP_PORT = 1134
 
 function createServer(sendCallback) {
     console.log('Starting UDP server on port ' + UDP_PORT);

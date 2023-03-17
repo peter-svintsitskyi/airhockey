@@ -1,6 +1,8 @@
 import cv2
 import abc
 
+import numpy as np
+
 from airhockey.debug import DebugWindow
 from typing import Optional, Tuple, List, Any
 
@@ -125,7 +127,8 @@ class VerifyPositionQuery(Query):
 
 
 class QueryContext(object):
-    def __init__(self, *, translator, frame_reader: FrameReader,
+    def __init__(self, *, translator: WorldToFrameTranslator, frame_reader: FrameReader,
+                 markers_color_range: ColorRange,
                  debug_window: Optional[DebugWindow]):
         self.translator = translator
         self.frame_reader = frame_reader
@@ -134,6 +137,7 @@ class QueryContext(object):
         self.debug_window = debug_window
         self.queries: List = []
         self.can_execute = False
+        self.dectector = ColorDetector(color_range=markers_color_range)
 
     def __enter__(self):
         self.frame = self.frame_reader.read()
@@ -142,6 +146,35 @@ class QueryContext(object):
         if self.debug_window is not None:
             self.debug_window.set_frame(self.frame, self.frame_hsv)
         self.can_execute = True
+
+        markers = self.dectector.get_positions(self.frame_hsv, 4)
+        if len(markers) < 4:
+            return self
+
+        markers = self._sort_markers(
+            np.float32([[a, b] for (a, b) in markers]))
+
+        dst = np.float32(
+            [
+                [0, 0],
+                [1200, 0],
+                [1200, 600],
+                [0, 600]
+            ]
+        )
+
+        transform = cv2.getPerspectiveTransform(markers, dst)
+
+        if self.debug_window is not None:
+            self.debug_window.set_frame(self.frame, self.frame_hsv)
+
+        if np.linalg.matrix_rank(transform) != 3:
+            return self
+
+        self.translator.frame_to_world = transform
+        self.translator.world_to_frame = np.linalg.inv(
+            self.translator.frame_to_world)
+
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -158,3 +191,13 @@ class QueryContext(object):
         self.queries.append(query)
         return query.execute(
             self.frame_hsv, self.translator, self.debug_window)
+
+    def _sort_markers(self, markers):
+        result = np.zeros((4, 2), dtype="float32")
+        s = markers.sum(axis=1)
+        result[0] = markers[np.argmin(s)]
+        result[2] = markers[np.argmax(s)]
+        diff = np.diff(markers, axis=1)
+        result[1] = markers[np.argmin(diff)]
+        result[3] = markers[np.argmax(diff)]
+        return result

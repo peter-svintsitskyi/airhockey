@@ -26,7 +26,7 @@ logger.addHandler(console)
 logger.info("Welcome")
 
 robot_host = 'localhost'
-robot_port = 1133
+robot_port = 1134
 robot = Robot(host=robot_host, port=robot_port)
 
 puck_radius = 20
@@ -64,6 +64,7 @@ debug_window = DebugWindow(name="game",
 
 vision_query_context = QueryContext(translator=translator,
                                     frame_reader=video_stream,
+                                    markers_color_range=table_markers_color_range,
                                     debug_window=debug_window)
 
 await_video_handler = AwaitVideoHandler(video_stream=video_stream, timeout=10)
@@ -128,13 +129,13 @@ PLAY_GAME = "PLAY_GAME"
 state_transitions = {
     FAILED_STATE: (failed_handler, {}),
     AWAIT_VIDEO: (await_video_handler, {
-        await_video_handler.SUCCESS: DETECT_TABLE,
+        await_video_handler.SUCCESS: DETECT_PLAYERS,
         await_video_handler.TIMEOUT: FAILED_STATE,
     }),
-    DETECT_TABLE: (detect_table_handler, {
-        detect_table_handler.SUCCESS: DETECT_PLAYERS,
-        detect_table_handler.FAIL: FAILED_STATE,
-    }),
+    # DETECT_TABLE: (detect_table_handler, {
+    #     detect_table_handler.SUCCESS: DETECT_PLAYERS,
+    #     detect_table_handler.FAIL: FAILED_STATE,
+    # }),
     DETECT_PLAYERS: (detect_players_handler, {
         detect_players_handler.SUCCESS: CHECK_NETWORK,
         detect_players_handler.FAIL: FAILED_STATE,
