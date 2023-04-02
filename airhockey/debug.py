@@ -24,18 +24,20 @@ class DebugWindowLogHandler(logging.Handler):
         for m in self.messages:
             for index, line in enumerate(textwrap.wrap(m, 90)):
                 cv2.putText(frame, line,
-                            (500, y_start + line_num * 40 - index * 15 + 40),
+                            (300, y_start + line_num * 40 - index * 15 + 40),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (150, 255, 150),
                             thickness=2)
                 line_num += 1
 
 
 class DebugWindow(object):
-    def __init__(self, *, name, log, translator, table_size,
+    def __init__(self, *, name, log, table_size,
                  color_ranges: list['ColorRange']):
+        self.frame = self.frame_hsv = self.target = None
+        self.target_size = (1500, 1000)
+        self.video_region = (0, 0, 1200, 600)
+
         self.name = name
-        self.translator = translator
-        self.table_size = table_size
         self.color_ranges = color_ranges
         cv2.namedWindow(self.name, cv2.WINDOW_NORMAL)
         cv2.resizeWindow(self.name, 1000, 1000)
@@ -79,44 +81,41 @@ class DebugWindow(object):
 
     def set_frame(self, frame, hsv):
         self.frame = frame
-        self.hsv = hsv
+        self.frame_hsv = hsv
+        self.target = np.zeros(
+            (self.target_size[1], self.target_size[0], frame.shape[2]),
+            np.uint8
+        )
 
-    def draw(self, queries: list, frame_reader: FrameReader):
-        for query in queries:
-            query.draw(self)
-
-        points = [np.int32([
-            self.translator.w2f((0, 0)),
-            self.translator.w2f((1200, 0)),
-            self.translator.w2f((1200, 600)),
-            self.translator.w2f((0, 600)),
-        ]).reshape((-1, 1, 2))]
-
-        cv2.polylines(self.frame, points, True, (0, 255, 255), 2)
-
-        self.draw_circle((600, 300), (0, 0, 255))
-
+    def __enter__(self):
         h, w, d = self.frame.shape
-        target = np.zeros((h + 300, w + 300, d), np.uint8)
-        target[0:h, 0:w] = self.frame
-        self.log_handler.draw(target, h)
-        self.draw_color_previews(target, h)
-        self.draw_fps(target, frame_reader)
-        cv2.imshow(self.name, target)
+        dx, dy = self.video_region[0], self.video_region[1]
+        self.target[dy:h + dy, dx:w + dx] = self.frame
+        self.log_handler.draw(self.target, dy + self.video_region[3])
+        self.draw_color_previews(self.target, dy + self.video_region[3])
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        cv2.imshow(self.name, self.target)
+        cv2.waitKey(1)
+
+    def draw(self, frame_reader: FrameReader):
+        self.draw_fps(self.target, frame_reader)
 
         # for r in self.color_ranges:
         #     lower_color = np.array([r.h_low, r.sv_low, r.sv_low])
         #     upper_color = np.array([r.h_high, 255, 255])
-        #     mask = cv2.inRange(self.hsv, lower_color, upper_color)
+        #     mask = cv2.inRange(self.frame_hsv, lower_color, upper_color)
         #     cv2.imshow(r.name, mask)
-        cv2.waitKey(1)
 
-    def draw_circle(self, world_coordinates, color):
+    def draw_circle(self, frame_coordinates, color):
         hsv_color = np.uint8([[color]])
         bgr_color = cv2.cvtColor(hsv_color, cv2.COLOR_HSV2BGR)[0][0]
         bgr_color = (int(bgr_color[0]), int(bgr_color[1]), int(bgr_color[2]))
-        c = self.translator.w2f(world_coordinates)
-        cv2.circle(self.frame, c, 10, bgr_color, -1)
+        cv2.circle(self.frame, frame_coordinates, 10, bgr_color, -1)
+
+    def draw_poly(self, points, color):
+        points = [np.array(points, dtype=np.int32).reshape((-1, 1, 2))]
+        cv2.polylines(self.target, points, True, color, 2)
 
     def draw_fps(self, target, frame_reader: FrameReader):
         cv2.putText(target, str("Stream: {0}/{1:.2f} fps".format(
@@ -132,12 +131,7 @@ class Debug(object):
         self.translator = translator
         self.robot = robot
 
-    def draw(self, *, frame, world_debug, robot_position, robot_dst, fps,
-             video_stream):
-        # table
-        cv2.rectangle(frame, self.translator.w2f((0, 0)),
-                      self.translator.w2f(world_debug['table_size']),
-                      (0, 255, 255), 2)
+    def draw(self, *, frame, world_debug, robot_position, robot_dst):
 
         # trajectory
         for intersection in world_debug['trajectory']:
@@ -174,16 +168,3 @@ class Debug(object):
                 cv2.line(frame, self.translator.w2f(robot_position),
                          self.translator.w2f((int(rdX), int(rdY))),
                          (0, 255, 0), 7)
-
-        cv2.putText(frame, str("FPS: {0:.2f}".format(fps)), (10, 50),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), thickness=3)
-        cv2.putText(frame, str("Stream: {0}/{1:.2f} fps".format(
-            video_stream.frames_grabbed, video_stream.stream_fps())), (10, 80),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), thickness=3)
-        cv2.putText(frame, str("Processed: {0}/{1:.2f} fps".format(
-            video_stream.frames_read, video_stream.read_fps())), (10, 110),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), thickness=3)
-        # debug
-        # cv2.namedWindow('frame', cv2.WINDOW_NORMAL)
-        cv2.resizeWindow('frame', 600, 600)
-        cv2.imshow('frame', frame)

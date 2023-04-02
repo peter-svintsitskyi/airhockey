@@ -79,9 +79,10 @@ class VideoStream(FrameReader):
             if self.has_new_frame:
                 self.frames_read += 1
             frame = self.frame.copy()
+            frame_hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
             self.has_new_frame = False
 
-        return frame
+        return frame, frame_hsv
 
     def has_frame(self):
         return self.has_grabbed_frame
@@ -137,9 +138,10 @@ class ScreenCapture(FrameReader):
             if self.has_new_frame:
                 self.frames_read += 1
             frame = self.frame.copy()
+            frame_hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
             self.has_new_frame = False
 
-        return frame
+        return frame, frame_hsv
 
     def has_frame(self):
         return self.has_grabbed_frame

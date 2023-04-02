@@ -10,10 +10,10 @@ from airhockey.handlers.failed import FailedHandler
 from airhockey.handlers.play_game import PlayGameHandler
 from airhockey.handlers.test_moves import TestMovesHandler
 from airhockey.robot import Robot
+from airhockey.vision.transform import Perspective
 from airhockey.vision.video import ScreenCapture, VideoStream
 from airhockey.vision.color import ColorRange
 from airhockey.vision.query import QueryContext
-from airhockey.translate import WorldToFrameTranslator
 from airhockey.debug import DebugWindow
 
 logger = logging.getLogger("airhockey")
@@ -31,13 +31,12 @@ robot = Robot(host=robot_host, port=robot_port)
 
 puck_radius = 20
 table_size = (1200, 600)
-video_size = (1280, 720)
+video_size = (640, 480)
+screen_capture_size = (1280, 720)
 puck_workspace = table_size
 
 video_stream = VideoStream(0, video_size) \
-    if 'video' in sys.argv else ScreenCapture(video_size)
-
-translator = WorldToFrameTranslator(video_size, table_size)
+    if 'video' in sys.argv else ScreenCapture(screen_capture_size)
 
 table_markers_color_range = ColorRange(name="Table Markers",
                                        h_low=84,
@@ -54,18 +53,27 @@ robot_pusher_color_range = ColorRange(name="Robot Pusher",
                                       h_high=30,
                                       sv_low=53)
 
+perspective = Perspective(
+    markers_color_range=table_markers_color_range,
+    markers_world_positions=[
+        [0, 0],
+        [table_size[0], 0],
+        [table_size[0], table_size[1]],
+        [0, table_size[1]]
+    ],
+)
+
 debug_window = DebugWindow(name="game",
                            log="airhockey",
-                           translator=translator,
                            table_size=table_size,
                            color_ranges=[table_markers_color_range,
                                          puck_color_range,
                                          robot_pusher_color_range])
 
-vision_query_context = QueryContext(translator=translator,
-                                    frame_reader=video_stream,
-                                    markers_color_range=table_markers_color_range,
-                                    debug_window=debug_window)
+vision_query_context = QueryContext(
+    frame_reader=video_stream,
+    perspective=perspective,
+    debug_window=debug_window)
 
 await_video_handler = AwaitVideoHandler(video_stream=video_stream, timeout=10)
 
